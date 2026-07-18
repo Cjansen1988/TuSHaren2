@@ -1,0 +1,1495 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TuS Haren 2 – Spielvorbereitung</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind: kompiliert die Utility-Klassen direkt im Browser, kein Build-Schritt nötig -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Import-Map: sagt dem Browser, wo er React/Firebase als fertige Module herunterladen kann -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?external=react",
+          "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react",
+          "firebase/app": "https://esm.sh/firebase@10.12.2/app",
+          "firebase/auth": "https://esm.sh/firebase@10.12.2/auth",
+          "firebase/firestore": "https://esm.sh/firebase@10.12.2/firestore"
+        }
+      }
+    </script>
+    <!-- Babel: übersetzt den JSX-Code direkt im Browser, ersetzt den früheren "npm run build"-Schritt -->
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+    <style>
+      html, body, #root { height: 100%; }
+      body { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import ReactDOM from "react-dom/client";
+import {
+  Users, Shield, BarChart3, KeyRound, Plus, Trash2, Eye, EyeOff,
+  Lock, ChevronRight, Save, AlertCircle, LogOut, Mail
+} from "lucide-react";
+import { initializeApp } from "firebase/app";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut
+} from "firebase/auth";
+import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
+
+/* ---------------------------------------------------------------------- */
+/*  Firebase-Einrichtung -- eure Werte aus der Firebase-Konsole            */
+/* ---------------------------------------------------------------------- */
+
+// TODO: Ersetzt diese Werte durch eure eigene Firebase-Web-App-Konfiguration.
+// Firebase-Konsole -> Projekteinstellungen -> Eure Apps -> Web-App ->
+// "SDK-Einrichtung und Konfiguration". Diese Werte sind NICHT geheim
+// (sie sind im Browser sichtbar) - der Schutz kommt über firestore.rules.
+const firebaseConfig = {
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
+// Alle Daten dieser App liegen in einer eigenen Collection,
+// damit sie nicht mit anderen Firebase-Projekten/Apps kollidieren.
+const COLLECTION = "tusharen2";
+
+/* ---------------------------------------------------------------------- */
+/*  Firestore-Hook mit Echtzeit-Sync (ersetzt die alte useFirestoreValue.js) */
+/* ---------------------------------------------------------------------- */
+
+function useFirestoreValue(key, fallback) {
+  const [value, setValueState] = useState(fallback);
+  const [loaded, setLoaded] = useState(false);
+  const writingRef = React.useRef(false);
+
+  useEffect(() => {
+    const ref = doc(db, COLLECTION, key);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (writingRef.current) {
+          writingRef.current = false;
+          return;
+        }
+        if (snap.exists() && snap.data().value !== undefined) {
+          setValueState(snap.data().value);
+        } else {
+          setValueState(fallback);
+        }
+        setLoaded(true);
+      },
+      (err) => {
+        console.error(`Firestore-Fehler bei ${key}:`, err);
+        setLoaded(true);
+      }
+    );
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const setValue = useCallback(
+    async (next) => {
+      setValueState(next);
+      writingRef.current = true;
+      try {
+        await setDoc(doc(db, COLLECTION, key), { value: next, updatedAt: Date.now() });
+      } catch (err) {
+        console.error(`Konnte ${key} nicht speichern:`, err);
+        writingRef.current = false;
+      }
+    },
+    [key]
+  );
+
+  return [value, setValue, loaded];
+}
+
+
+/* ---------------------------------------------------------------------- */
+/*  Club crest -- TuS Haren 2 (real club logo, embedded as base64)         */
+/* ---------------------------------------------------------------------- */
+
+const CLUB_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfQAAAH0CAMAAAD8CC+4AAAACXBIWXMAAC4jAAAuIwF4pT92AAABm1BMVEVHcEzY2NfHxsXo6OjS0dB6eXd5eHa+vr1/fny1s7PR0M+hoJ7R0dGko6Fzc3BiYV7Dw8K2tbOwsK+KiYdXVlRfXlvBwcBWVVJxcG6Mi4k1My+PjozOzs2enZyNjIq0s7JramihoJ7v7++7u7pCQT6DgoBWVVKrq6omJCHd3d0sKijIyMjj4+OJiYdKSUcnJSHaJx0SEAv///8QDgnbJBoBAAANCwUXFRD9/fwJBgElJCESEQz5+fkjGxYUEg0fHhvKRDkcGRUAEQwzLywsKifaKh9LSUe/vb1APjvk5ONaWFY4NjTX1tZTUU+ioaCYVkPYPy9hX13u7u5sOTTQz853dXRHPzr09PRuGRIBCgZHIxtubGrp6enIx8fZNCerqqm2ZlCZl5fe3d1nZWSIhoXWLSTALyfQOS3OVEPVJx1HMiuSj4/WSjgwIBrMKiEJGhatLCU6HxhZLiWBRDjHYk2qTj9WRDy7OzCSX1F7MCa7U0SQLiWBVkuoPzS7RTmVQzgTDARbGRJmS0J0Rjt1VEpePDSgYlSLYlaqXE4i9Ll6AAAAZHRSTlMAKkNKFSBACf7+Y4vjZGN22GvbnvXXmJO83WrxfchyuujtgMfr58Ht3n/As5HF4PP////////////////////////////////////////////////////////////////////+SywpmgAAO2ZJREFUeNrsnYtPE9kXx0X6ACwPeSOioKjrruveye0jnQnTlnZqQ1OkIZAtZBsI1D5CpQoFRIWNsD/9s38FXZfwajuce+fOzPkmGhVNZD49557zvefeuXXL+uro7Lp3797Y6vry8mIiEZXOKZpILC4vr6+O1f5SV2fHLZR51epyuXpmFxKypChSQKKqqlBJoVS6IEprXzn9cqD2syQnFmZ7av/4Nj5D88jhdHpG+/9IxiJqjaiqSs1KPfkcRGLJP/pHPU6nA5+o0HK7W3sHfklFQ34qwcgfiqZ+Gehtdbvx6Yqoh8O/ppNBH5WggP/M/n5fMJn+dfghPmOR8vng0Eha9gUllqJBn5weGRpswedtfLnWNbYQ8/nBw/vKoI8tjHW14nM3TLdd7amAKvGWogZS7Vjb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";
+
+function ClubCrest({ size = 40 }) {
+  return (
+    <img
+      src={CLUB_LOGO}
+      alt="TuS Haren e.V. 1920 Wappen"
+      width={size}
+      height={size}
+      className="shrink-0 rounded-full"
+      style={{ width: size, height: size, objectFit: "contain" }}
+    />
+  );
+}
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function formatDateDE(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}.${m}.${y}`;
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Formation definitions (x/y in % of pitch, y=0 own goal, y=100 attack)  */
+/* ---------------------------------------------------------------------- */
+
+const FORMATIONS = {
+  "4-4-2": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 14, y: 72 },
+    { id: "IV1", label: "IV", x: 36, y: 78 },
+    { id: "IV2", label: "IV", x: 64, y: 78 },
+    { id: "RV", label: "RV", x: 86, y: 72 },
+    { id: "LM", label: "LM", x: 14, y: 46 },
+    { id: "ZM1", label: "ZM", x: 37, y: 50 },
+    { id: "ZM2", label: "ZM", x: 63, y: 50 },
+    { id: "RM", label: "RM", x: 86, y: 46 },
+    { id: "ST1", label: "ST", x: 36, y: 16 },
+    { id: "ST2", label: "ST", x: 64, y: 16 },
+  ],
+  "4-3-3": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 14, y: 72 },
+    { id: "IV1", label: "IV", x: 36, y: 78 },
+    { id: "IV2", label: "IV", x: 64, y: 78 },
+    { id: "RV", label: "RV", x: 86, y: 72 },
+    { id: "ZM1", label: "ZM", x: 30, y: 52 },
+    { id: "ZM2", label: "ZM", x: 50, y: 57 },
+    { id: "ZM3", label: "ZM", x: 70, y: 52 },
+    { id: "LA", label: "LA", x: 15, y: 20 },
+    { id: "ST", label: "ST", x: 50, y: 12 },
+    { id: "RA", label: "RA", x: 85, y: 20 },
+  ],
+  "4-2-3-1": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 14, y: 72 },
+    { id: "IV1", label: "IV", x: 36, y: 78 },
+    { id: "IV2", label: "IV", x: 64, y: 78 },
+    { id: "RV", label: "RV", x: 86, y: 72 },
+    { id: "DM1", label: "DM", x: 36, y: 58 },
+    { id: "DM2", label: "DM", x: 64, y: 58 },
+    { id: "OML", label: "OM", x: 20, y: 35 },
+    { id: "OMZ", label: "OM", x: 50, y: 38 },
+    { id: "OMR", label: "OM", x: 80, y: 35 },
+    { id: "ST", label: "ST", x: 50, y: 14 },
+  ],
+  "3-5-2": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "IV1", label: "IV", x: 25, y: 76 },
+    { id: "IV2", label: "IV", x: 50, y: 80 },
+    { id: "IV3", label: "IV", x: 75, y: 76 },
+    { id: "LM", label: "LM", x: 10, y: 50 },
+    { id: "ZM1", label: "ZM", x: 32, y: 55 },
+    { id: "ZM2", label: "ZM", x: 50, y: 58 },
+    { id: "ZM3", label: "ZM", x: 68, y: 55 },
+    { id: "RM", label: "RM", x: 90, y: 50 },
+    { id: "ST1", label: "ST", x: 36, y: 16 },
+    { id: "ST2", label: "ST", x: 64, y: 16 },
+  ],
+  "3-4-3": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "IV1", label: "IV", x: 25, y: 76 },
+    { id: "IV2", label: "IV", x: 50, y: 80 },
+    { id: "IV3", label: "IV", x: 75, y: 76 },
+    { id: "LM", label: "LM", x: 15, y: 50 },
+    { id: "ZM1", label: "ZM", x: 38, y: 56 },
+    { id: "ZM2", label: "ZM", x: 62, y: 56 },
+    { id: "RM", label: "RM", x: 85, y: 50 },
+    { id: "LA", label: "LA", x: 20, y: 20 },
+    { id: "ST", label: "ST", x: 50, y: 12 },
+    { id: "RA", label: "RA", x: 80, y: 20 },
+  ],
+  "5-3-2": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 10, y: 66 },
+    { id: "IV1", label: "IV", x: 30, y: 76 },
+    { id: "IV2", label: "IV", x: 50, y: 80 },
+    { id: "IV3", label: "IV", x: 70, y: 76 },
+    { id: "RV", label: "RV", x: 90, y: 66 },
+    { id: "ZM1", label: "ZM", x: 30, y: 50 },
+    { id: "ZM2", label: "ZM", x: 50, y: 55 },
+    { id: "ZM3", label: "ZM", x: 70, y: 50 },
+    { id: "ST1", label: "ST", x: 36, y: 16 },
+    { id: "ST2", label: "ST", x: 64, y: 16 },
+  ],
+};
+
+const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Fl\u00fcgel", "ST"];
+const MATCH_TYPES = ["Liga", "Pokal", "Testspiel"];
+const MATCH_TYPE_COLORS = { Liga: "#3fae6b", Pokal: "#c8a13f", Testspiel: "#7a93a8" };
+const CARD_TYPES = ["Gelb", "Gelb-Rot", "Rot"];
+const CARD_COLORS = { Gelb: "#e7c246", "Gelb-Rot": "#e08a2e", Rot: "#c8102e" };
+
+const emptyGame = {
+  matchType: "Liga",
+  formation: "4-4-2",
+  matchSquad: [],
+  lineup: {},
+  benchNumbers: {},
+  date: "",
+  kickoff: "",
+  meetingTime: "",
+  homeAway: "Heim",
+  jerseyColor: "",
+  location: "",
+  opponentName: "",
+  ourNotes: "",
+  ourTactics: "",
+  opponentFormation: "",
+  opponentStrengths: "",
+  opponentWeaknesses: "",
+  opponentKeyPlayers: "",
+  report: { scoreUs: "", scoreThem: "", goals: [], cards: [], subs: [] },
+};
+
+/* ---------------------------------------------------------------------- */
+/*  Small shared UI bits                                                   */
+/* ---------------------------------------------------------------------- */
+
+function Field({ label, children }) {
+  return (
+    <label className="block mb-3">
+      <span className="block text-[11px] font-semibold tracking-wide uppercase text-stone-400 mb-1">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+const inputCls =
+  "w-full bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-3 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#c8102e] focus:border-transparent";
+
+/* ---------------------------------------------------------------------- */
+/*  Auth gate -- Firebase email/password login for the two trainers        */
+/* ---------------------------------------------------------------------- */
+
+function AuthGate({ onAuthed }) {
+  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setError("");
+    if (!email.trim() || password.length < 6) {
+      setError("E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (mode === "signin") {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email.trim(), password);
+      }
+      onAuthed();
+    } catch (err) {
+      const map = {
+        "auth/invalid-credential": "E-Mail oder Passwort falsch.",
+        "auth/wrong-password": "E-Mail oder Passwort falsch.",
+        "auth/user-not-found": "Kein Konto mit dieser E-Mail gefunden.",
+        "auth/email-already-in-use": "Für diese E-Mail existiert bereits ein Konto.",
+        "auth/weak-password": "Passwort ist zu schwach (mind. 6 Zeichen).",
+        "auth/invalid-email": "Ungültige E-Mail-Adresse.",
+      };
+      setError(map[err.code] || "Etwas ist schiefgelaufen. Bitte erneut versuchen.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center px-4 relative overflow-hidden">
+      <div
+        className="absolute inset-0 opacity-[0.05] pointer-events-none"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(0deg, transparent, transparent 39px, #fff 39px, #fff 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, #fff 39px, #fff 40px)",
+        }}
+      />
+      <div className="relative w-full max-w-sm bg-[#122e23] border border-[#254536] rounded-xl p-8 shadow-2xl">
+        <div className="flex flex-col items-center mb-6">
+          <ClubCrest size={56} />
+          <h1 className="text-2xl text-white tracking-wide mt-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            TUS HAREN 2
+          </h1>
+          <p className="text-stone-400 text-xs mt-1 uppercase tracking-widest flex items-center gap-1.5">
+            <Lock size={11} /> {mode === "signin" ? "Anmelden" : "Konto erstellen"}
+          </p>
+        </div>
+
+        <div className="relative mb-3">
+          <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="E-Mail"
+            className={inputCls + " pl-9"}
+          />
+        </div>
+
+        <div className="relative mb-3">
+          <input
+            type={show ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Passwort"
+            className={inputCls + " pr-10"}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+          <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">
+            {show ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 text-[#ff8a8a] text-xs mb-3">
+            <AlertCircle size={14} /> {error}
+          </div>
+        )}
+
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="w-full bg-[#c8102e] hover:bg-[#a80d26] disabled:opacity-60 transition-colors text-white font-semibold py-2.5 rounded-md text-sm tracking-wide"
+        >
+          {busy ? "Einen Moment …" : mode === "signin" ? "Anmelden" : "Konto erstellen & starten"}
+        </button>
+
+        <button
+          onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}
+          className="w-full text-center text-stone-400 hover:text-stone-200 text-xs mt-4"
+        >
+          {mode === "signin" ? "Noch kein Konto? Hier erstellen" : "Schon ein Konto? Hier anmelden"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KaderTab({ squad, setSquad }) {
+  const [draft, setDraft] = useState({ name: "", number: "", position: POSITIONS[0], notes: "" });
+
+  const addPlayer = () => {
+    if (!draft.name.trim()) return;
+    const next = [...squad, { id: uid(), ...draft }];
+    setSquad(next);
+    setDraft({ name: "", number: "", position: POSITIONS[0], notes: "" });
+  };
+
+  const removePlayer = (id) => setSquad(squad.filter((p) => p.id !== id));
+
+  const updatePlayer = (id, field, value) =>
+    setSquad(squad.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <h2 className="text-white text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        KADERLISTE
+      </h2>
+
+      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          <input
+            className={inputCls}
+            placeholder="Name"
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+          <input
+            className={inputCls}
+            placeholder="Rückennr."
+            value={draft.number}
+            onChange={(e) => setDraft({ ...draft, number: e.target.value })}
+          />
+          <select
+            className={inputCls}
+            value={draft.position}
+            onChange={(e) => setDraft({ ...draft, position: e.target.value })}
+          >
+            {POSITIONS.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+          <input
+            className={inputCls}
+            placeholder="Notiz (optional)"
+            value={draft.notes}
+            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+          />
+        </div>
+        <button
+          onClick={addPlayer}
+          className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md"
+        >
+          <Plus size={15} /> Spieler hinzufügen
+        </button>
+      </div>
+
+      {squad.length === 0 ? (
+        <p className="text-stone-500 text-sm">Noch keine Spieler eingetragen.</p>
+      ) : (
+        <div className="space-y-2">
+          {squad
+            .slice()
+            .sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99))
+            .map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-3 bg-[#122e23] border border-[#254536] rounded-lg px-3 py-2"
+              >
+                <div className="w-8 h-8 rounded-full bg-[#0f2a20] border border-[#2a4a3c] flex items-center justify-center text-xs text-stone-300 font-bold shrink-0">
+                  {p.number || "–"}
+                </div>
+                <input
+                  className="bg-transparent text-sm text-white flex-1 min-w-0 focus:outline-none"
+                  value={p.name}
+                  onChange={(e) => updatePlayer(p.id, "name", e.target.value)}
+                />
+                <select
+                  className="bg-[#0f2a20] border border-[#2a4a3c] rounded-md text-xs text-stone-300 px-2 py-1"
+                  value={p.position}
+                  onChange={(e) => updatePlayer(p.id, "position", e.target.value)}
+                >
+                  {POSITIONS.map((pos) => (
+                    <option key={pos}>{pos}</option>
+                  ))}
+                </select>
+                <input
+                  className="hidden sm:block bg-transparent text-xs text-stone-400 flex-1 min-w-0 focus:outline-none"
+                  placeholder="Notiz"
+                  value={p.notes}
+                  onChange={(e) => updatePlayer(p.id, "notes", e.target.value)}
+                />
+                <button onClick={() => removePlayer(p.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Tab: Aktuelles Spiel                                                    */
+/* ---------------------------------------------------------------------- */
+
+function GameTab({ squad, game, setGame, matches, setMatches }) {
+  const [section, setSection] = useState("vorbereitung");
+  const slots = FORMATIONS[game.formation] || FORMATIONS["4-4-2"];
+  const matchSquad = game.matchSquad || [];
+  const lineup = game.lineup || {};
+  const assignedIds = Object.values(lineup).map((v) => v?.playerId).filter(Boolean);
+  const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
+  const benchNumbers = game.benchNumbers || {};
+  const report = game.report || emptyGame.report;
+
+  const getPlayer = (id) => squad.find((p) => p.id === id);
+
+  const setBenchNumber = (playerId, value) => {
+    setGame({ ...game, benchNumbers: { ...benchNumbers, [playerId]: value } });
+  };
+
+  const toggleMatchSquad = (id) => {
+    const next = matchSquad.includes(id)
+      ? matchSquad.filter((x) => x !== id)
+      : [...matchSquad, id];
+    // if removed from matchday squad, also remove from lineup
+    let nextLineup = lineup;
+    if (!next.includes(id)) {
+      nextLineup = {};
+      for (const [slotId, v] of Object.entries(lineup)) {
+        if (v?.playerId !== id) nextLineup[slotId] = v;
+      }
+    }
+    setGame({ ...game, matchSquad: next, lineup: nextLineup });
+  };
+
+  const setSlotPlayer = (slotId, playerId) => {
+    const next = { ...lineup };
+    if (playerId === "") {
+      delete next[slotId];
+    } else {
+      // free this player from any other slot
+      for (const k of Object.keys(next)) {
+        if (next[k]?.playerId === playerId) delete next[k];
+      }
+      const p = getPlayer(playerId);
+      next[slotId] = { playerId, number: p?.number || "", position: p?.position || slots.find(s=>s.id===slotId)?.label || "" };
+    }
+    setGame({ ...game, lineup: next });
+  };
+
+  const setSlotField = (slotId, field, value) => {
+    const next = { ...lineup };
+    if (!next[slotId]) return;
+    next[slotId] = { ...next[slotId], [field]: value };
+    setGame({ ...game, lineup: next });
+  };
+
+  const changeFormation = (formation) => {
+    setGame({ ...game, formation, lineup: {} });
+  };
+
+  const resetGame = () => {
+    if (window.confirm("Neue Spielvorbereitung starten? Aktuelle Angaben zu Spiel und Spielbericht gehen verloren (Statistik bleibt erhalten).")) {
+      setGame({ ...emptyGame });
+    }
+  };
+
+  /* ---- match report helpers ---- */
+  const setReport = (patch) => setGame({ ...game, report: { ...report, ...patch } });
+
+  const [goalDraft, setGoalDraft] = useState({ playerId: "", assistId: "", minute: "" });
+  const [cardDraft, setCardDraft] = useState({ playerId: "", type: CARD_TYPES[0], minute: "" });
+  const [subDraft, setSubDraft] = useState({ outId: "", inId: "", minute: "" });
+
+  const addGoal = () => {
+    if (!goalDraft.playerId) return;
+    const p = getPlayer(goalDraft.playerId);
+    const a = goalDraft.assistId ? getPlayer(goalDraft.assistId) : null;
+    setReport({
+      goals: [...report.goals, {
+        id: uid(), minute: goalDraft.minute,
+        playerId: goalDraft.playerId, playerName: p?.name || "?",
+        assistId: goalDraft.assistId || null, assistName: a?.name || "",
+      }],
+    });
+    setGoalDraft({ playerId: "", assistId: "", minute: "" });
+  };
+  const removeGoal = (id) => setReport({ goals: report.goals.filter((g) => g.id !== id) });
+
+  const addCard = () => {
+    if (!cardDraft.playerId) return;
+    const p = getPlayer(cardDraft.playerId);
+    setReport({
+      cards: [...report.cards, {
+        id: uid(), minute: cardDraft.minute, type: cardDraft.type,
+        playerId: cardDraft.playerId, playerName: p?.name || "?",
+      }],
+    });
+    setCardDraft({ playerId: "", type: CARD_TYPES[0], minute: "" });
+  };
+  const removeCard = (id) => setReport({ cards: report.cards.filter((c) => c.id !== id) });
+
+  const addSub = () => {
+    if (!subDraft.outId || !subDraft.inId) return;
+    const out = getPlayer(subDraft.outId);
+    const inn = getPlayer(subDraft.inId);
+    setReport({
+      subs: [...report.subs, {
+        id: uid(), minute: subDraft.minute,
+        outId: subDraft.outId, outName: out?.name || "?",
+        inId: subDraft.inId, inName: inn?.name || "?",
+      }],
+    });
+    setSubDraft({ outId: "", inId: "", minute: "" });
+  };
+  const removeSub = (id) => setReport({ subs: report.subs.filter((s) => s.id !== id) });
+
+  const onPitchEver = useMemo(() => {
+    const ids = new Set(assignedIds);
+    report.subs.forEach((s) => ids.add(s.inId));
+    return ids;
+  }, [assignedIds, report.subs]);
+
+  const unusedPlayers = matchSquad
+    .filter((id) => !onPitchEver.has(id))
+    .map((id) => getPlayer(id))
+    .filter(Boolean);
+
+  const finishReport = () => {
+    const record = {
+      id: uid(),
+      date: game.date,
+      opponent: game.opponentName,
+      matchType: game.matchType,
+      scoreUs: report.scoreUs,
+      scoreThem: report.scoreThem,
+      notes: game.location ? `Ort: ${game.location}` : "",
+      formation: game.formation,
+      goals: report.goals,
+      cards: report.cards,
+      subs: report.subs,
+      unused: unusedPlayers.map((p) => p.name),
+    };
+    setMatches([...matches, record]);
+    window.alert("Spielbericht wurde in die Statistik übernommen.");
+  };
+
+  /* ---- team message (WhatsApp) ---- */
+  const [copyState, setCopyState] = useState("idle"); // idle | copied | failed
+
+  const teamMessage = useMemo(() => {
+    const lineupNumbers = {};
+    Object.values(lineup).forEach((entry) => {
+      if (entry?.playerId) lineupNumbers[entry.playerId] = entry.number;
+    });
+    const allNumbers = { ...benchNumbers, ...lineupNumbers };
+
+    const kaderLines = matchSquad
+      .map((id) => getPlayer(id))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const na = Number(allNumbers[a.id] ?? a.number) || 99;
+        const nb = Number(allNumbers[b.id] ?? b.number) || 99;
+        return na - nb;
+      })
+      .map((p) => `${allNumbers[p.id] ?? p.number ?? "–"} – ${p.name}`)
+      .join("\n");
+
+    const lines = [
+      `⚽ TuS Haren 2 – Spielankündigung`,
+      ``,
+      `🗓️ Datum: ${formatDateDE(game.date) || "–"}`,
+      `🆚 Gegner: ${game.opponentName || "–"}`,
+      `🏆 Spielart: ${game.matchType}`,
+      `⏰ Anstoß: ${game.kickoff || "–"} Uhr`,
+      `📍 ${game.homeAway === "Heim" ? "Heimspiel" : "Auswärtsspiel"}${game.location ? ` – ${game.location}` : ""}`,
+      `🕒 Treffpunkt: ${game.meetingTime || "–"}`,
+      `👕 Trikotfarbe: ${game.jerseyColor || "–"}`,
+      ``,
+      `Kader (Trikotnummer – Name):`,
+      kaderLines || "–",
+    ];
+    return lines.join("\n");
+  }, [game, matchSquad, lineup, squad]);
+
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(teamMessage);
+    setCopyState(ok ? "copied" : "failed");
+    setTimeout(() => setCopyState("idle"), 2500);
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 className="text-white text-xl" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          AKTUELLES SPIEL
+        </h2>
+        <button onClick={resetGame} className="text-xs text-stone-400 hover:text-[#ff8a8a] underline">
+          Neue Spielvorbereitung starten
+        </button>
+      </div>
+
+      <div className="flex gap-2 mb-5">
+        {[
+          ["vorbereitung", "Vorbereitung"],
+          ["nachricht", "Team-Nachricht"],
+          ["spielbericht", "Spielbericht"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSection(id)}
+            className={
+              "text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors " +
+              (section === id
+                ? "bg-[#c8102e] border-[#c8102e] text-white"
+                : "border-[#254536] text-stone-400 hover:text-stone-200")
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {section === "vorbereitung" && (
+        <div className="grid lg:grid-cols-5 gap-6">
+          {/* Pitch */}
+          <div className="lg:col-span-3">
+            <div className="flex items-center gap-3 mb-3 flex-wrap">
+              <span className="text-[11px] uppercase tracking-wide text-stone-400 font-semibold">
+                System
+              </span>
+              <select
+                className={inputCls + " w-40"}
+                value={game.formation}
+                onChange={(e) => changeFormation(e.target.value)}
+              >
+                {Object.keys(FORMATIONS).map((f) => (
+                  <option key={f}>{f}</option>
+                ))}
+              </select>
+              <span className="text-[11px] uppercase tracking-wide text-stone-400 font-semibold ml-2">
+                Spieltyp
+              </span>
+              <div className="flex gap-1.5">
+                {MATCH_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setGame({ ...game, matchType: t })}
+                    className={
+                      "text-xs font-semibold px-2.5 py-1 rounded-full border " +
+                      (game.matchType === t ? "text-white" : "text-stone-400 border-[#254536]")
+                    }
+                    style={game.matchType === t ? { background: MATCH_TYPE_COLORS[t], borderColor: MATCH_TYPE_COLORS[t] } : {}}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {matchSquad.length === 0 && (
+              <p className="text-stone-500 text-xs mb-2">
+                Wählt zuerst rechts den Kader für diesen Spieltag – erst dann könnt ihr Spieler auf das Feld stellen.
+              </p>
+            )}
+
+            <div
+              className="relative w-full rounded-lg border-2 border-[#e8e6df]/30 overflow-hidden"
+              style={{
+                aspectRatio: "0.68",
+                background:
+                  "repeating-linear-gradient(to bottom, #1c5238 0, #1c5238 11.11%, #1a4a32 11.11%, #1a4a32 22.22%)",
+              }}
+            >
+              <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
+              <div className="absolute left-1/2 top-3 bottom-3 w-px bg-white/25 -translate-x-1/2 pointer-events-none" />
+              <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
+              <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
+
+              {slots.map((slot) => {
+                const entry = lineup[slot.id];
+                const options = squad.filter((p) => matchSquad.includes(p.id));
+                return (
+                  <div
+                    key={slot.id}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5"
+                    style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                  >
+                    <select
+                      className="w-[84px] sm:w-[96px] text-[11px] text-center bg-white/95 border border-[#c8102e] rounded-full px-1 py-1 font-semibold text-[#122e23] shadow"
+                      value={entry?.playerId || ""}
+                      onChange={(e) => setSlotPlayer(slot.id, e.target.value)}
+                    >
+                      <option value="">{slot.label}</option>
+                      {options.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.number ? `#${p.number} ` : ""}
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    {entry && (
+                      <div className="flex gap-0.5">
+                        <input
+                          className="w-8 text-[10px] text-center bg-[#0f2a20]/90 border border-[#2a4a3c] rounded text-stone-200 px-0.5 py-0.5"
+                          value={entry.number}
+                          onChange={(e) => setSlotField(slot.id, "number", e.target.value)}
+                          placeholder="Nr"
+                        />
+                        <input
+                          className="w-12 text-[10px] text-center bg-[#0f2a20]/90 border border-[#2a4a3c] rounded text-stone-200 px-0.5 py-0.5"
+                          value={entry.position}
+                          onChange={(e) => setSlotField(slot.id, "position", e.target.value)}
+                          placeholder="Pos"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {bench.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] uppercase tracking-wide text-stone-400 font-semibold mb-1.5">
+                  Bank (im Kader, nicht in der Startelf)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {bench.map((p) => (
+                    <span key={p.id} className="flex items-center gap-1 text-xs bg-[#122e23] border border-[#254536] text-stone-300 pl-1 pr-2 py-1 rounded-full">
+                      <span className="text-stone-400">#</span>
+                      <input
+                        className="w-7 bg-[#0f2a20] border border-[#2a4a3c] rounded text-center text-stone-100 py-0.5"
+                        value={benchNumbers[p.id] ?? p.number ?? ""}
+                        onChange={(e) => setBenchNumber(p.id, e.target.value)}
+                      />
+                      <span>{p.name}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Info panels */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+              <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+                <Shield size={15} className="text-[#c8102e]" /> Rahmendaten
+              </h3>
+              <Field label="Gegner">
+                <input className={inputCls} value={game.opponentName} onChange={(e) => setGame({ ...game, opponentName: e.target.value })} />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Datum">
+                  <input type="date" className={inputCls} value={game.date} onChange={(e) => setGame({ ...game, date: e.target.value })} />
+                </Field>
+                <Field label="Anstoß">
+                  <input type="time" className={inputCls} value={game.kickoff} onChange={(e) => setGame({ ...game, kickoff: e.target.value })} />
+                </Field>
+              </div>
+              <Field label="Ort / Anfahrt">
+                <input className={inputCls} value={game.location} onChange={(e) => setGame({ ...game, location: e.target.value })} />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Treffpunkt / -zeit">
+                  <input className={inputCls} placeholder='z.B. 12:30 Uhr Sportheim' value={game.meetingTime} onChange={(e) => setGame({ ...game, meetingTime: e.target.value })} />
+                </Field>
+                <Field label="Heim / Auswärts">
+                  <div className="flex gap-1.5 pt-1">
+                    {["Heim", "Auswärts"].map((h) => (
+                      <button
+                        key={h}
+                        onClick={() => setGame({ ...game, homeAway: h })}
+                        className={
+                          "flex-1 text-xs font-semibold px-2 py-2 rounded-md border " +
+                          (game.homeAway === h ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[#2a4a3c] text-stone-400")
+                        }
+                      >
+                        {h}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+              <Field label="Trikotfarbe">
+                <input className={inputCls} placeholder="z.B. Rot/Weiß" value={game.jerseyColor} onChange={(e) => setGame({ ...game, jerseyColor: e.target.value })} />
+              </Field>
+            </div>
+
+            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+              <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+                <Users size={15} className="text-[#c8102e]" /> Kader für diesen Spieltag
+              </h3>
+              {squad.length === 0 ? (
+                <p className="text-stone-500 text-xs">Erst Spieler im Tab „Kader" anlegen.</p>
+              ) : (
+                <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                  {squad.slice().sort((a,b)=>(Number(a.number)||99)-(Number(b.number)||99)).map((p) => (
+                    <label key={p.id} className="flex items-center gap-2 text-sm text-stone-200 py-0.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={matchSquad.includes(p.id)}
+                        onChange={() => toggleMatchSquad(p.id)}
+                        className="accent-[#c8102e]"
+                      />
+                      <span className="w-7 text-xs text-stone-400">{p.number || "–"}</span>
+                      <span className="flex-1 truncate">{p.name}</span>
+                      <span className="text-xs text-stone-500">{p.position}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+              <h3 className="text-white text-sm font-semibold mb-3">Über uns</h3>
+              <Field label="Ausfälle / Sonstiges">
+                <textarea rows={2} className={inputCls} value={game.ourNotes} onChange={(e) => setGame({ ...game, ourNotes: e.target.value })} />
+              </Field>
+              <Field label="Taktische Idee">
+                <textarea rows={2} className={inputCls} value={game.ourTactics} onChange={(e) => setGame({ ...game, ourTactics: e.target.value })} />
+              </Field>
+            </div>
+
+            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+              <h3 className="text-white text-sm font-semibold mb-3">Über den Gegner</h3>
+              <Field label="Vermutetes System">
+                <input className={inputCls} value={game.opponentFormation} onChange={(e) => setGame({ ...game, opponentFormation: e.target.value })} />
+              </Field>
+              <Field label="Stärken">
+                <textarea rows={2} className={inputCls} value={game.opponentStrengths} onChange={(e) => setGame({ ...game, opponentStrengths: e.target.value })} />
+              </Field>
+              <Field label="Schwächen">
+                <textarea rows={2} className={inputCls} value={game.opponentWeaknesses} onChange={(e) => setGame({ ...game, opponentWeaknesses: e.target.value })} />
+              </Field>
+              <Field label="Schlüsselspieler">
+                <input className={inputCls} value={game.opponentKeyPlayers} onChange={(e) => setGame({ ...game, opponentKeyPlayers: e.target.value })} />
+              </Field>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {section === "nachricht" && (
+        <div className="max-w-xl">
+          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-4">
+            <h3 className="text-white text-sm font-semibold mb-1">Vorschau</h3>
+            <p className="text-stone-500 text-[11px] mb-3">
+              Wird aus den Angaben in „Vorbereitung" erzeugt. Einfach kopieren und in eure WhatsApp-Gruppe einfügen.
+            </p>
+            <pre className="whitespace-pre-wrap break-words bg-[#0f2a20] border border-[#2a4a3c] rounded-md p-3 text-sm text-stone-100 leading-relaxed">
+              {teamMessage}
+            </pre>
+          </div>
+          <button
+            onClick={handleCopy}
+            className="w-full flex items-center justify-center gap-2 bg-[#c8102e] hover:bg-[#a80d26] text-white font-semibold py-2.5 rounded-md text-sm"
+          >
+            <Save size={15} />
+            {copyState === "copied" ? "Kopiert!" : copyState === "failed" ? "Kopieren fehlgeschlagen – bitte manuell markieren" : "Nachricht kopieren"}
+          </button>
+          {matchSquad.length === 0 && (
+            <p className="text-stone-500 text-xs mt-3">
+              Tipp: Wählt unter „Vorbereitung" zuerst den Kader für diesen Spieltag aus, damit die Spielerliste in der Nachricht erscheint.
+            </p>
+          )}
+        </div>
+      )}
+
+      {section === "spielbericht" && (
+        <div className="grid lg:grid-cols-2 gap-5">
+          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+            <h3 className="text-white text-sm font-semibold mb-3">Endstand</h3>
+            <div className="flex items-center gap-3">
+              <input className={inputCls + " w-20 text-center"} inputMode="numeric" value={report.scoreUs} onChange={(e) => setReport({ scoreUs: e.target.value.replace(/\D/, "") })} placeholder="Wir" />
+              <span className="text-stone-400">:</span>
+              <input className={inputCls + " w-20 text-center"} inputMode="numeric" value={report.scoreThem} onChange={(e) => setReport({ scoreThem: e.target.value.replace(/\D/, "") })} placeholder="Gegner" />
+              <span className="text-xs text-stone-500">gegen {game.opponentName || "Gegner"}</span>
+            </div>
+          </div>
+
+          <div />
+
+          {/* Goals */}
+          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+            <h3 className="text-white text-sm font-semibold mb-3">Torschützen</h3>
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              <select className={inputCls + " col-span-2 text-xs"} value={goalDraft.playerId} onChange={(e) => setGoalDraft({ ...goalDraft, playerId: e.target.value })}>
+                <option value="">Torschütze</option>
+                {squad.filter((p) => matchSquad.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select className={inputCls + " col-span-1 text-xs"} value={goalDraft.assistId} onChange={(e) => setGoalDraft({ ...goalDraft, assistId: e.target.value })}>
+                <option value="">Vorlage</option>
+                {squad.filter((p) => matchSquad.includes(p.id) && p.id !== goalDraft.playerId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <input className={inputCls + " text-xs"} placeholder="Min." value={goalDraft.minute} onChange={(e) => setGoalDraft({ ...goalDraft, minute: e.target.value.replace(/\D/, "") })} />
+            </div>
+            <button onClick={addGoal} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-xs font-semibold px-3 py-1.5 rounded-md mb-3">
+              <Plus size={13} /> Tor eintragen
+            </button>
+            <div className="space-y-1">
+              {report.goals.map((g) => (
+                <div key={g.id} className="flex items-center gap-2 text-sm text-stone-200 bg-[#0f2a20] rounded-md px-2 py-1.5">
+                  <span className="text-xs text-stone-400 w-8">{g.minute ? `${g.minute}'` : "–"}</span>
+                  <span className="flex-1">⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}</span>
+                  <button onClick={() => removeGoal(g.id)} className="text-stone-500 hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cards */}
+          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+            <h3 className="text-white text-sm font-semibold mb-3">Karten</h3>
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              <select className={inputCls + " col-span-2 text-xs"} value={cardDraft.playerId} onChange={(e) => setCardDraft({ ...cardDraft, playerId: e.target.value })}>
+                <option value="">Spieler</option>
+                {squad.filter((p) => matchSquad.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select className={inputCls + " text-xs"} value={cardDraft.type} onChange={(e) => setCardDraft({ ...cardDraft, type: e.target.value })}>
+                {CARD_TYPES.map((t) => <option key={t}>{t}</option>)}
+              </select>
+              <input className={inputCls + " text-xs"} placeholder="Min." value={cardDraft.minute} onChange={(e) => setCardDraft({ ...cardDraft, minute: e.target.value.replace(/\D/, "") })} />
+            </div>
+            <button onClick={addCard} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-xs font-semibold px-3 py-1.5 rounded-md mb-3">
+              <Plus size={13} /> Karte eintragen
+            </button>
+            <div className="space-y-1">
+              {report.cards.map((c) => (
+                <div key={c.id} className="flex items-center gap-2 text-sm text-stone-200 bg-[#0f2a20] rounded-md px-2 py-1.5">
+                  <span className="text-xs text-stone-400 w-8">{c.minute ? `${c.minute}'` : "–"}</span>
+                  <span className="w-2.5 h-3.5 rounded-sm shrink-0" style={{ background: CARD_COLORS[c.type] }} />
+                  <span className="flex-1">{c.playerName} — {c.type}</span>
+                  <button onClick={() => removeCard(c.id)} className="text-stone-500 hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Subs */}
+          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+            <h3 className="text-white text-sm font-semibold mb-3">Auswechslungen</h3>
+            <div className="grid grid-cols-5 gap-2 mb-2">
+              <select className={inputCls + " col-span-2 text-xs"} value={subDraft.outId} onChange={(e) => setSubDraft({ ...subDraft, outId: e.target.value })}>
+                <option value="">Raus</option>
+                {squad.filter((p) => matchSquad.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select className={inputCls + " col-span-2 text-xs"} value={subDraft.inId} onChange={(e) => setSubDraft({ ...subDraft, inId: e.target.value })}>
+                <option value="">Rein</option>
+                {squad.filter((p) => matchSquad.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <input className={inputCls + " text-xs"} placeholder="Min." value={subDraft.minute} onChange={(e) => setSubDraft({ ...subDraft, minute: e.target.value.replace(/\D/, "") })} />
+            </div>
+            <button onClick={addSub} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-xs font-semibold px-3 py-1.5 rounded-md mb-3">
+              <Plus size={13} /> Wechsel eintragen
+            </button>
+            <div className="space-y-1">
+              {report.subs.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 text-sm text-stone-200 bg-[#0f2a20] rounded-md px-2 py-1.5">
+                  <span className="text-xs text-stone-400 w-8">{s.minute ? `${s.minute}'` : "–"}</span>
+                  <span className="flex-1">⇄ {s.outName} raus, {s.inName} rein</span>
+                  <button onClick={() => removeSub(s.id)} className="text-stone-500 hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 lg:col-span-2">
+            <h3 className="text-white text-sm font-semibold mb-2">Im Kader, aber nicht eingesetzt</h3>
+            {unusedPlayers.length === 0 ? (
+              <p className="text-stone-500 text-xs">Alle nominierten Spieler kamen zum Einsatz.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {unusedPlayers.map((p) => (
+                  <span key={p.id} className="text-xs bg-[#0f2a20] border border-[#2a4a3c] text-stone-300 px-2 py-1 rounded-full">
+                    {p.number ? `#${p.number} ` : ""}{p.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="lg:col-span-2">
+            <button onClick={finishReport} className="w-full flex items-center justify-center gap-2 bg-[#c8102e] hover:bg-[#a80d26] text-white font-semibold py-2.5 rounded-md text-sm">
+              <Save size={15} /> Spielbericht abschließen &amp; in Statistik übernehmen
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Tab: Statistik                                                          */
+/* ---------------------------------------------------------------------- */
+
+function StatsTab({ matches, setMatches }) {
+  const [draft, setDraft] = useState({
+    date: "",
+    opponent: "",
+    matchType: "Liga",
+    scoreUs: "",
+    scoreThem: "",
+    notes: "",
+  });
+  const [filter, setFilter] = useState("Alle");
+  const [expanded, setExpanded] = useState({});
+
+  const addMatch = () => {
+    if (!draft.opponent.trim() || draft.scoreUs === "" || draft.scoreThem === "") return;
+    setMatches([...matches, { id: uid(), ...draft, goals: [], cards: [], subs: [], unused: [] }]);
+    setDraft({ date: "", opponent: "", matchType: "Liga", scoreUs: "", scoreThem: "", notes: "" });
+  };
+
+  const removeMatch = (id) => setMatches(matches.filter((m) => m.id !== id));
+  const toggleExpand = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
+
+  const filtered = filter === "Alle" ? matches : matches.filter((m) => (m.matchType || "Liga") === filter);
+
+  const summary = useMemo(() => {
+    let w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    filtered.forEach((m) => {
+      const us = Number(m.scoreUs), them = Number(m.scoreThem);
+      gf += us;
+      ga += them;
+      if (us > them) w++;
+      else if (us === them) d++;
+      else l++;
+    });
+    return { w, d, l, gf, ga, diff: gf - ga };
+  }, [filtered]);
+
+  const sorted = filtered.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <h2 className="text-white text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        STATISTIK
+      </h2>
+
+      <div className="flex gap-1.5 mb-4">
+        {["Alle", ...MATCH_TYPES].map((t) => (
+          <button
+            key={t}
+            onClick={() => setFilter(t)}
+            className={
+              "text-xs font-semibold px-3 py-1.5 rounded-full border " +
+              (filter === t ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[#254536] text-stone-400 hover:text-stone-200")
+            }
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6">
+        {[
+          ["Siege", summary.w, "#3fae6b"],
+          ["Unent.", summary.d, "#c8a13f"],
+          ["Nied.", summary.l, "#c8102e"],
+          ["Tore", summary.gf, "#e8e6df"],
+          ["Gegentore", summary.ga, "#e8e6df"],
+          ["Diff.", (summary.diff > 0 ? "+" : "") + summary.diff, "#e8e6df"],
+        ].map(([label, val, color]) => (
+          <div key={label} className="bg-[#122e23] border border-[#254536] rounded-lg py-3 text-center">
+            <div className="text-xl font-bold" style={{ color, fontFamily: "'Oswald', sans-serif" }}>
+              {val}
+            </div>
+            <div className="text-[10px] uppercase tracking-wide text-stone-400 mt-0.5">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
+        <h3 className="text-white text-sm font-semibold mb-3">Spiel manuell eintragen</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-3">
+          <input type="date" className={inputCls} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+          <input className={inputCls + " sm:col-span-2"} placeholder="Gegner" value={draft.opponent} onChange={(e) => setDraft({ ...draft, opponent: e.target.value })} />
+          <select className={inputCls} value={draft.matchType} onChange={(e) => setDraft({ ...draft, matchType: e.target.value })}>
+            {MATCH_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <input className={inputCls} placeholder="Tore wir" inputMode="numeric" value={draft.scoreUs} onChange={(e) => setDraft({ ...draft, scoreUs: e.target.value.replace(/\D/, "") })} />
+          <input className={inputCls} placeholder="Tore Gegner" inputMode="numeric" value={draft.scoreThem} onChange={(e) => setDraft({ ...draft, scoreThem: e.target.value.replace(/\D/, "") })} />
+        </div>
+        <input className={inputCls + " mb-3"} placeholder="Notiz (optional)" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+        <button onClick={addMatch} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md">
+          <Plus size={15} /> Ergebnis speichern
+        </button>
+        <p className="text-stone-500 text-[11px] mt-2">
+          Ausführliche Spielberichte (Torschützen, Karten, Wechsel) trägt ihr am besten direkt im Tab „Aktuelles Spiel" unter „Spielbericht" ein.
+        </p>
+      </div>
+
+      {sorted.length === 0 ? (
+        <p className="text-stone-500 text-sm">Noch keine Spiele erfasst.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {sorted.map((m) => {
+            const us = Number(m.scoreUs), them = Number(m.scoreThem);
+            const outcome = us > them ? "#3fae6b" : us === them ? "#c8a13f" : "#c8102e";
+            const hasDetails = (m.goals?.length || m.cards?.length || m.subs?.length || m.unused?.length);
+            const isOpen = expanded[m.id];
+            return (
+              <div key={m.id} className="bg-[#122e23] border border-[#254536] rounded-lg overflow-hidden">
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <div className="w-1.5 h-8 rounded-full shrink-0" style={{ background: outcome }} />
+                  <div className="w-20 text-xs text-stone-400 shrink-0">{m.date || "–"}</div>
+                  <span
+                    className="hidden sm:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                    style={{ background: (MATCH_TYPE_COLORS[m.matchType] || "#7a93a8") + "33", color: MATCH_TYPE_COLORS[m.matchType] || "#7a93a8" }}
+                  >
+                    {m.matchType || "Liga"}
+                  </span>
+                  <div className="flex-1 text-sm text-white truncate">{m.opponent}</div>
+                  <div className="text-sm font-bold text-white tabular-nums">{m.scoreUs} : {m.scoreThem}</div>
+                  {hasDetails ? (
+                    <button onClick={() => toggleExpand(m.id)} className="text-stone-400 hover:text-white shrink-0">
+                      <ChevronRight size={16} className={"transition-transform " + (isOpen ? "rotate-90" : "")} />
+                    </button>
+                  ) : <span className="w-4 shrink-0" />}
+                  <button onClick={() => removeMatch(m.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                {isOpen && (
+                  <div className="border-t border-[#254536] px-4 py-3 text-xs text-stone-300 space-y-2">
+                    {m.notes && <p className="text-stone-400">{m.notes}</p>}
+                    {m.goals?.length > 0 && (
+                      <div>
+                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Tore</p>
+                        {m.goals.map((g) => (
+                          <p key={g.id}>{g.minute ? `${g.minute}' ` : ""}⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}</p>
+                        ))}
+                      </div>
+                    )}
+                    {m.cards?.length > 0 && (
+                      <div>
+                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Karten</p>
+                        {m.cards.map((c) => (
+                          <p key={c.id}>{c.minute ? `${c.minute}' ` : ""}{c.playerName} — {c.type}</p>
+                        ))}
+                      </div>
+                    )}
+                    {m.subs?.length > 0 && (
+                      <div>
+                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Wechsel</p>
+                        {m.subs.map((s) => (
+                          <p key={s.id}>{s.minute ? `${s.minute}' ` : ""}⇄ {s.outName} raus, {s.inName} rein</p>
+                        ))}
+                      </div>
+                    )}
+                    {m.unused?.length > 0 && (
+                      <div>
+                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Im Kader, nicht eingesetzt</p>
+                        <p>{m.unused.join(", ")}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Tab: Info (Logins / Passwörter)                                         */
+/* ---------------------------------------------------------------------- */
+
+function InfoTab({ creds, setCreds }) {
+  const [draft, setDraft] = useState({ service: "", username: "", password: "", notes: "" });
+  const [visible, setVisible] = useState({});
+
+  const add = () => {
+    if (!draft.service.trim()) return;
+    setCreds([...creds, { id: uid(), ...draft }]);
+    setDraft({ service: "", username: "", password: "", notes: "" });
+  };
+
+  const remove = (id) => setCreds(creds.filter((c) => c.id !== id));
+  const update = (id, field, value) => setCreds(creds.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+  const toggle = (id) => setVisible((v) => ({ ...v, [id]: !v[id] }));
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <h2 className="text-white text-xl mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        INFO &amp; ZUGÄNGE
+      </h2>
+      <p className="text-stone-500 text-xs mb-4">
+        Logins, Portale, Verbandslinks etc. Nur unverschlüsselt gespeichert – für sensible Konten
+        besser einen echten Passwort-Manager nutzen.
+      </p>
+
+      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <input className={inputCls} placeholder="Dienst / Portal" value={draft.service} onChange={(e) => setDraft({ ...draft, service: e.target.value })} />
+          <input className={inputCls} placeholder="Benutzername" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} />
+          <input className={inputCls} placeholder="Passwort" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} />
+          <input className={inputCls} placeholder="Notiz (optional)" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+        </div>
+        <button onClick={add} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md">
+          <Plus size={15} /> Eintrag hinzufügen
+        </button>
+      </div>
+
+      {creds.length === 0 ? (
+        <p className="text-stone-500 text-sm">Noch keine Zugänge gespeichert.</p>
+      ) : (
+        <div className="space-y-2">
+          {creds.map((c) => (
+            <div key={c.id} className="bg-[#122e23] border border-[#254536] rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <KeyRound size={14} className="text-[#c8102e] shrink-0" />
+                <input
+                  className="bg-transparent text-sm font-semibold text-white flex-1 min-w-0 focus:outline-none"
+                  value={c.service}
+                  onChange={(e) => update(c.id, "service", e.target.value)}
+                />
+                <button onClick={() => remove(c.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pl-6">
+                <input
+                  className="bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-2 py-1.5 text-xs text-stone-200 focus:outline-none"
+                  placeholder="Benutzername"
+                  value={c.username}
+                  onChange={(e) => update(c.id, "username", e.target.value)}
+                />
+                <div className="relative">
+                  <input
+                    type={visible[c.id] ? "text" : "password"}
+                    className="w-full bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-2 py-1.5 pr-8 text-xs text-stone-200 focus:outline-none"
+                    placeholder="Passwort"
+                    value={c.password}
+                    onChange={(e) => update(c.id, "password", e.target.value)}
+                  />
+                  <button
+                    onClick={() => toggle(c.id)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-500"
+                  >
+                    {visible[c.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
+                <input
+                  className="col-span-2 bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-2 py-1.5 text-xs text-stone-400 focus:outline-none"
+                  placeholder="Notiz"
+                  value={c.notes}
+                  onChange={(e) => update(c.id, "notes", e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  App shell                                                               */
+/* ---------------------------------------------------------------------- */
+
+const TABS = [
+  { id: "kader", label: "Kader", icon: Users },
+  { id: "spiel", label: "Aktuelles Spiel", icon: Shield },
+  { id: "statistik", label: "Statistik", icon: BarChart3 },
+  { id: "info", label: "Info", icon: KeyRound },
+];
+
+export default function App() {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState(null);
+  const [tab, setTab] = useState("kader");
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthChecked(true);
+    });
+    return unsub;
+  }, []);
+
+  const [squad, setSquad, squadLoaded] = useFirestoreValue("squad", []);
+  const [game, setGame, gameLoaded] = useFirestoreValue("currentGame", emptyGame);
+  const [matches, setMatches, matchesLoaded] = useFirestoreValue("matches", []);
+  const [creds, setCreds, credsLoaded] = useFirestoreValue("credentials", []);
+
+  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded;
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center text-stone-400 text-sm">
+        Lädt …
+      </div>
+    );
+  }
+
+  if (!user) return <AuthGate onAuthed={() => {}} />;
+
+  if (!allLoaded) {
+    return (
+      <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center text-stone-400 text-sm">
+        Lädt Daten …
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0b1f18]" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <header className="border-b border-[#254536] px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ClubCrest size={36} />
+          <div>
+            <h1 className="text-white text-lg leading-tight tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              TUS HAREN 2
+            </h1>
+            <p className="text-stone-500 text-[11px] uppercase tracking-widest leading-tight">Spielvorbereitung</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:block text-xs text-stone-400">{user.email}</span>
+          <button
+            onClick={() => signOut(auth)}
+            className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-white border border-[#254536] rounded-md px-2.5 py-1.5"
+          >
+            <LogOut size={13} /> Abmelden
+          </button>
+        </div>
+      </header>
+
+      <nav className="flex overflow-x-auto border-b border-[#254536] px-2 sm:px-6">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={
+                "flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors " +
+                (active ? "border-[#c8102e] text-white" : "border-transparent text-stone-400 hover:text-stone-200")
+              }
+            >
+              <Icon size={15} /> {t.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <main className="px-4 sm:px-6 py-6">
+        {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} />}
+        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} />}
+        {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} />}
+        {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
+      </main>
+    </div>
+  );
+}
+
+const rootEl = document.getElementById("root");
+ReactDOM.createRoot(rootEl).render(<App />);
+    </script>
+  </body>
+</html>
