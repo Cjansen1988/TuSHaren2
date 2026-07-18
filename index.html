@@ -168,7 +168,7 @@ function initials(fullName) {
 }
 
 function computePlayerStats(playerId, matches) {
-  let apps = 0, minutes = 0, goals = 0, assists = 0, yellow = 0, red = 0;
+  let apps = 0, minutes = 0, goals = 0, assists = 0, yellow = 0, red = 0, subIn = 0, subOut = 0;
   (matches || [])
     .filter((m) => (m.matchType || "Liga") === "Liga")
     .forEach((m) => {
@@ -188,12 +188,16 @@ function computePlayerStats(playerId, matches) {
           else red += 1;
         }
       });
+      (m.subs || []).forEach((s) => {
+        if (s.inId === playerId) subIn += 1;
+        if (s.outId === playerId) subOut += 1;
+      });
     });
   const avgMinutes = apps > 0 ? Math.round(minutes / apps) : 0;
   const contributions = goals + assists;
   const scorerPerGame = apps > 0 ? Math.round((contributions / apps) * 100) / 100 : 0;
   const minutesPerScorer = contributions > 0 ? Math.round(minutes / contributions) : null;
-  return { apps, minutes, avgMinutes, goals, assists, scorerPerGame, minutesPerScorer, yellow, red };
+  return { apps, minutes, avgMinutes, goals, assists, scorerPerGame, minutesPerScorer, yellow, red, subIn, subOut };
 }
 
 function resizeImageFile(file, maxSize = 200) {
@@ -375,6 +379,8 @@ function PlayerCard({ player, stats, onClose }) {
     ["Min./Scorer", stats.minutesPerScorer ?? "–"],
     ["Gelbe Karten", stats.yellow],
     ["Rote Karten", stats.red],
+    ["Eingewechselt", stats.subIn],
+    ["Ausgewechselt", stats.subOut],
   ];
   const lastAlone = statItems.length % 2 === 1;
   return (
