@@ -2201,6 +2201,22 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("kader");
+  const [theme, setThemeState] = useState(() => {
+    try {
+      return localStorage.getItem("tush2-theme") || "dark";
+    } catch {
+      return "dark";
+    }
+  });
+  const [presenting, setPresenting] = useState(false);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setThemeState(next);
+    try {
+      localStorage.setItem("tush2-theme", next);
+    } catch {}
+  };
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -2220,24 +2236,32 @@ export default function App() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center text-[var(--text-secondary)] text-sm">
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center text-[var(--text-secondary)] text-sm" style={THEME_VARS[theme]}>
         Lädt …
       </div>
     );
   }
 
-  if (!user) return <AuthGate onAuthed={() => {}} />;
+  if (!user) return <div style={THEME_VARS[theme]}><AuthGate onAuthed={() => {}} /></div>;
 
   if (!allLoaded) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center text-[var(--text-secondary)] text-sm">
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center text-[var(--text-secondary)] text-sm" style={THEME_VARS[theme]}>
         Lädt Daten …
       </div>
     );
   }
 
+  if (presenting) {
+    return (
+      <div style={THEME_VARS[theme]}>
+        <PresentationView squad={squad} game={game} onExit={() => setPresenting(false)} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[var(--bg-page)]" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen bg-[var(--bg-page)]" style={{ fontFamily: "'Inter', sans-serif", ...THEME_VARS[theme] }}>
       <header className="border-b border-[var(--border-card)] px-4 sm:px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ClubCrest size={36} />
@@ -2248,8 +2272,22 @@ export default function App() {
             <p className="text-[var(--text-tertiary)] text-[11px] uppercase tracking-widest leading-tight">Spielvorbereitung</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:block text-xs text-[var(--text-secondary)]">{user.email}</span>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:block text-xs text-[var(--text-secondary)] mr-1">{user.email}</span>
+          <button
+            onClick={() => setPresenting(true)}
+            className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md px-2.5 py-1.5"
+            title="Präsentationsmodus für TV/Beamer"
+          >
+            <Monitor size={13} /> Präsentation
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md w-8 h-8"
+            title={theme === "dark" ? "Zu Hell wechseln" : "Zu Dunkel wechseln"}
+          >
+            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
           <button
             onClick={() => signOut(auth)}
             className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md px-2.5 py-1.5"
