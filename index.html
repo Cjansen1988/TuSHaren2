@@ -35,7 +35,7 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module" data-presets="react">
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ReactDOM from "react-dom/client";
 import {
   Users, Shield, BarChart3, KeyRound, Plus, Trash2, Eye, EyeOff,
@@ -151,6 +151,13 @@ function formatDateDE(iso) {
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return iso;
   return `${d}.${m}.${y}`;
+}
+
+function shortName(fullName) {
+  if (!fullName) return "";
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  return `${parts[0][0]}. ${parts[parts.length - 1]}`;
 }
 
 async function copyToClipboard(text) {
@@ -388,6 +395,7 @@ const emptyGame = {
   matchSquad: [],
   lineup: {},
   benchNumbers: {},
+  pressingLine: 50,
   date: "",
   kickoff: "",
   meetingTime: "",
@@ -395,6 +403,7 @@ const emptyGame = {
   jerseyColor: "",
   location: "",
   opponentName: "",
+  reviewNotes: "",
   ourNotes: "",
   ourTactics: "",
   opponentFormation: "",
@@ -654,8 +663,51 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
   const benchNumbers = game.benchNumbers || {};
   const report = game.report || emptyGame.report;
+  const pressingLine = game.pressingLine ?? 50;
 
   const getPlayer = (id) => squad.find((p) => p.id === id);
+
+  /* ---- Pressinglinie: per Ziehen einstellbar ---- */
+  const pitchRef = useRef(null);
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const [draggingLine, setDraggingLine] = useState(false);
+
+  useEffect(() => {
+    if (!draggingLine) return;
+    const onMove = (e) => {
+      if (!pitchRef.current) return;
+      const rect = pitchRef.current.getBoundingClientRect();
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let pct = ((clientY - rect.top) / rect.height) * 100;
+      pct = Math.max(4, Math.min(96, pct));
+      setGame({ ...gameRef.current, pressingLine: pct });
+    };
+    const onUp = () => setDraggingLine(false);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggingLine]);
+
+  /* ---- letztes Spiel / Bilanz gegen diesen Gegner ---- */
+  const sortedMatches = useMemo(
+    () => (matches || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [matches]
+  );
+  const lastMatchOverall = sortedMatches[0] || null;
+  const headToHead = useMemo(() => {
+    if (!game.opponentName?.trim()) return null;
+    const target = game.opponentName.trim().toLowerCase();
+    return sortedMatches.find((m) => (m.opponent || "").trim().toLowerCase() === target) || null;
+  }, [sortedMatches, game.opponentName]);
 
   const setBenchNumber = (playerId, value) => {
     setGame({ ...game, benchNumbers: { ...benchNumbers, [playerId]: value } });
@@ -1023,11 +1075,13 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             )}
 
             <div
+              ref={pitchRef}
               className="relative w-full rounded-lg border-2 border-[#e8e6df]/30 overflow-hidden"
               style={{
                 aspectRatio: "0.68",
                 background:
                   "repeating-linear-gradient(to bottom, #1c5238 0, #1c5238 11.11%, #1a4a32 11.11%, #1a4a32 22.22%)",
+                touchAction: draggingLine ? "none" : "auto",
               }}
             >
               <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
@@ -1035,6 +1089,22 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
               <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
               <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
+
+              {/* Pressinglinie */}
+              <div
+                className="absolute left-0 right-0 border-t-2 border-dashed"
+                style={{ top: `${pressingLine}%`, borderColor: "#ffd54a" }}
+              >
+                <div
+                  onPointerDown={() => setDraggingLine(true)}
+                  onTouchStart={() => setDraggingLine(true)}
+                  className="absolute -left-1 -translate-y-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-ns-resize select-none shadow"
+                  style={{ background: "#ffd54a", color: "#122e23", touchAction: "none" }}
+                  title="Ziehen, um die Pressinglinie zu verschieben"
+                >
+                  Pressing
+                </div>
+              </div>
 
               {slots.map((slot) => {
                 const entry = lineup[slot.id];
@@ -1046,7 +1116,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                     style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                   >
                     <select
-                      className="w-[84px] sm:w-[96px] text-[11px] text-center bg-white/95 border border-[#c8102e] rounded-full px-1 py-1 font-semibold text-[#122e23] shadow"
+                      className="w-[100px] sm:w-[118px] text-[10px] text-center bg-white/95 border border-[#c8102e] rounded-full px-1 py-1 font-semibold text-[#122e23] shadow truncate"
                       value={entry?.playerId || ""}
                       onChange={(e) => setSlotPlayer(slot.id, e.target.value)}
                     >
@@ -1054,7 +1124,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                       {options.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.number ? `#${p.number} ` : ""}
-                          {p.name}
+                          {shortName(p.name)}
                         </option>
                       ))}
                     </select>
@@ -1078,6 +1148,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 );
               })}
             </div>
+
+            <p className="text-stone-500 text-[11px] mt-1.5">
+              Die gelbe „Pressing"-Linie könnt ihr auf dem Feld nach oben oder unten ziehen.
+            </p>
 
             {bench.length > 0 && (
               <div className="mt-3">
@@ -1103,6 +1177,33 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
           {/* Info panels */}
           <div className="lg:col-span-2 space-y-4">
+            {(lastMatchOverall || headToHead) && (
+              <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
+                <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+                  <BarChart3 size={15} className="text-[#c8102e]" /> Letztes Spiel &amp; Bilanz
+                </h3>
+                {lastMatchOverall && (
+                  <div className="flex items-center gap-2 text-sm mb-1.5">
+                    <span className="text-stone-500 text-xs w-24 shrink-0">Letztes Spiel</span>
+                    <span className="text-white font-semibold tabular-nums">
+                      {lastMatchOverall.scoreUs}:{lastMatchOverall.scoreThem}
+                    </span>
+                    <span className="text-stone-300 truncate">gegen {lastMatchOverall.opponent}</span>
+                    <span className="text-stone-500 text-xs ml-auto shrink-0">{formatDateDE(lastMatchOverall.date)}</span>
+                  </div>
+                )}
+                {headToHead && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-stone-500 text-xs w-24 shrink-0">Gegen {game.opponentName}</span>
+                    <span className="text-white font-semibold tabular-nums">
+                      {headToHead.scoreUs}:{headToHead.scoreThem}
+                    </span>
+                    <span className="text-stone-500 text-xs ml-auto shrink-0">{formatDateDE(headToHead.date)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
               <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
                 <Shield size={15} className="text-[#c8102e]" /> Rahmendaten
@@ -1174,6 +1275,9 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
             <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
               <h3 className="text-white text-sm font-semibold mb-3">Über uns</h3>
+              <Field label="Rückblick / Allgemeines (z.B. wie war das letzte Spiel)">
+                <textarea rows={2} className={inputCls} value={game.reviewNotes} onChange={(e) => setGame({ ...game, reviewNotes: e.target.value })} />
+              </Field>
               <Field label="Ausfälle / Sonstiges">
                 <textarea rows={2} className={inputCls} value={game.ourNotes} onChange={(e) => setGame({ ...game, ourNotes: e.target.value })} />
               </Field>
