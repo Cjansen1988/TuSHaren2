@@ -39,7 +39,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import ReactDOM from "react-dom/client";
 import {
   Users, Shield, BarChart3, KeyRound, Plus, Trash2, Eye, EyeOff,
-  Lock, ChevronRight, Save, AlertCircle, LogOut, Mail, CreditCard
+  Lock, ChevronRight, Save, AlertCircle, LogOut, Mail, CreditCard,
+  Sun, Moon, Monitor, X
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -145,6 +146,31 @@ function ClubCrest({ size = 40 }) {
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+const THEME_VARS = {
+  dark: {
+    "--bg-page": "#0b1f18",
+    "--bg-card": "#122e23",
+    "--bg-input": "#0f2a20",
+    "--border-card": "#254536",
+    "--border-input": "#2a4a3c",
+    "--text-primary": "#ffffff",
+    "--text-secondary": "#a8a29e",
+    "--text-tertiary": "#78716c",
+    "--text-body": "#e7e5e4",
+  },
+  light: {
+    "--bg-page": "#f4f1ea",
+    "--bg-card": "#ffffff",
+    "--bg-input": "#f6f4ee",
+    "--border-card": "#e3ddcd",
+    "--border-input": "#d9d2bf",
+    "--text-primary": "#1c2620",
+    "--text-secondary": "#6b6558",
+    "--text-tertiary": "#8a8478",
+    "--text-body": "#2a352e",
+  },
+};
 
 function formatDateDE(iso) {
   if (!iso) return "";
@@ -354,7 +380,7 @@ function parseFussballDeSchedule(text, ourKeyword) {
 function Field({ label, children }) {
   return (
     <label className="block mb-3">
-      <span className="block text-[11px] font-semibold tracking-wide uppercase text-stone-400 mb-1">
+      <span className="block text-[11px] font-semibold tracking-wide uppercase text-[var(--text-secondary)] mb-1">
         {label}
       </span>
       {children}
@@ -363,7 +389,7 @@ function Field({ label, children }) {
 }
 
 const inputCls =
-  "w-full bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-3 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#c8102e] focus:border-transparent";
+  "w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-3 py-2 text-sm text-[var(--text-body)] placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#c8102e] focus:border-transparent";
 
 
 const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Flügel", "ST"];
@@ -423,14 +449,14 @@ function PlayerCard({ player, stats, onClose }) {
               <div className="text-xl font-bold text-[#a3172a]" style={{ fontFamily: "'Oswald', sans-serif" }}>
                 {val}
               </div>
-              <div className="text-[10px] uppercase tracking-wide text-stone-500 mt-0.5">{label}</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mt-0.5">{label}</div>
             </div>
           ))}
         </div>
-        <p className="bg-white text-center text-stone-400 text-[10px] pb-2 -mt-1">nur Ligaspiele</p>
+        <p className="bg-white text-center text-[var(--text-secondary)] text-[10px] pb-2 -mt-1">nur Ligaspiele</p>
         <button
           onClick={onClose}
-          className="w-full text-center text-stone-500 hover:text-[#c8102e] text-xs py-3 bg-white border-t border-stone-200"
+          className="w-full text-center text-[var(--text-tertiary)] hover:text-[#c8102e] text-xs py-3 bg-white border-t border-stone-200"
         >
           Schließen
         </button>
@@ -467,11 +493,11 @@ function KaderTab({ squad, setSquad, matches }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h2 className="text-white text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+      <h2 className="text-[var(--text-primary)] text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
         KADERLISTE
       </h2>
 
-      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
           <input
             className={inputCls}
@@ -510,7 +536,7 @@ function KaderTab({ squad, setSquad, matches }) {
       </div>
 
       {squad.length === 0 ? (
-        <p className="text-stone-500 text-sm">Noch keine Spieler eingetragen.</p>
+        <p className="text-[var(--text-tertiary)] text-sm">Noch keine Spieler eingetragen.</p>
       ) : (
         <div className="space-y-2">
           {squad
@@ -519,10 +545,10 @@ function KaderTab({ squad, setSquad, matches }) {
             .map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-3 bg-[#122e23] border border-[#254536] rounded-lg px-3 py-2"
+                className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2"
               >
                 <label
-                  className="w-8 h-8 rounded-full bg-[#0f2a20] border border-[#2a4a3c] flex items-center justify-center text-xs text-stone-300 font-bold shrink-0 cursor-pointer overflow-hidden"
+                  className="w-8 h-8 rounded-full bg-[var(--bg-input)] border border-[var(--border-input)] flex items-center justify-center text-xs text-[var(--text-secondary)] font-bold shrink-0 cursor-pointer overflow-hidden"
                   title="Foto hochladen"
                 >
                   {p.photo ? (
@@ -538,12 +564,12 @@ function KaderTab({ squad, setSquad, matches }) {
                   />
                 </label>
                 <input
-                  className="bg-transparent text-sm text-white flex-1 min-w-0 focus:outline-none"
+                  className="bg-transparent text-sm text-[var(--text-primary)] flex-1 min-w-0 focus:outline-none"
                   value={p.name}
                   onChange={(e) => updatePlayer(p.id, "name", e.target.value)}
                 />
                 <select
-                  className="bg-[#0f2a20] border border-[#2a4a3c] rounded-md text-xs text-stone-300 px-2 py-1"
+                  className="bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-xs text-[var(--text-secondary)] px-2 py-1"
                   value={p.position}
                   onChange={(e) => updatePlayer(p.id, "position", e.target.value)}
                 >
@@ -552,15 +578,15 @@ function KaderTab({ squad, setSquad, matches }) {
                   ))}
                 </select>
                 <input
-                  className="hidden sm:block bg-transparent text-xs text-stone-400 flex-1 min-w-0 focus:outline-none"
+                  className="hidden sm:block bg-transparent text-xs text-[var(--text-secondary)] flex-1 min-w-0 focus:outline-none"
                   placeholder="Notiz"
                   value={p.notes}
                   onChange={(e) => updatePlayer(p.id, "notes", e.target.value)}
                 />
-                <button onClick={() => setCardPlayer(p)} className="text-stone-500 hover:text-white shrink-0" title="Spielerkarte anzeigen">
+                <button onClick={() => setCardPlayer(p)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] shrink-0" title="Spielerkarte anzeigen">
                   <CreditCard size={15} />
                 </button>
-                <button onClick={() => removePlayer(p.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                <button onClick={() => removePlayer(p.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -742,7 +768,7 @@ function AuthGate({ onAuthed }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center px-4 relative overflow-hidden">
       <div
         className="absolute inset-0 opacity-[0.05] pointer-events-none"
         style={{
@@ -750,19 +776,19 @@ function AuthGate({ onAuthed }) {
             "repeating-linear-gradient(0deg, transparent, transparent 39px, #fff 39px, #fff 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, #fff 39px, #fff 40px)",
         }}
       />
-      <div className="relative w-full max-w-sm bg-[#122e23] border border-[#254536] rounded-xl p-8 shadow-2xl">
+      <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-6">
           <ClubCrest size={56} />
-          <h1 className="text-2xl text-white tracking-wide mt-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <h1 className="text-2xl text-[var(--text-primary)] tracking-wide mt-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
             TUS HAREN 2
           </h1>
-          <p className="text-stone-400 text-xs mt-1 uppercase tracking-widest flex items-center gap-1.5">
+          <p className="text-[var(--text-secondary)] text-xs mt-1 uppercase tracking-widest flex items-center gap-1.5">
             <Lock size={11} /> {mode === "signin" ? "Anmelden" : "Konto erstellen"}
           </p>
         </div>
 
         <div className="relative mb-3">
-          <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+          <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
           <input
             type="email"
             value={email}
@@ -781,7 +807,7 @@ function AuthGate({ onAuthed }) {
             className={inputCls + " pr-10"}
             onKeyDown={(e) => e.key === "Enter" && submit()}
           />
-          <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">
+          <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
@@ -802,7 +828,7 @@ function AuthGate({ onAuthed }) {
 
         <button
           onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}
-          className="w-full text-center text-stone-400 hover:text-stone-200 text-xs mt-4"
+          className="w-full text-center text-[var(--text-secondary)] hover:text-[var(--text-body)] text-xs mt-4"
         >
           {mode === "signin" ? "Noch kein Konto? Hier erstellen" : "Schon ein Konto? Hier anmelden"}
         </button>
@@ -1098,10 +1124,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h2 className="text-white text-xl" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        <h2 className="text-[var(--text-primary)] text-xl" style={{ fontFamily: "'Oswald', sans-serif" }}>
           AKTUELLES SPIEL
         </h2>
-        <button onClick={resetGame} className="text-xs text-stone-400 hover:text-[#ff8a8a] underline">
+        <button onClick={resetGame} className="text-xs text-[var(--text-secondary)] hover:text-[#ff8a8a] underline">
           Neue Spielvorbereitung starten
         </button>
       </div>
@@ -1120,7 +1146,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               "text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors " +
               (section === id
                 ? "bg-[#c8102e] border-[#c8102e] text-white"
-                : "border-[#254536] text-stone-400 hover:text-stone-200")
+                : "border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-body)]")
             }
           >
             {label}
@@ -1130,9 +1156,9 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
       {section === "spielplan" && (
         <div className="max-w-2xl">
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-5">
-            <h3 className="text-white text-sm font-semibold mb-1">Spielplan von fussball.de importieren</h3>
-            <p className="text-stone-500 text-[11px] mb-3">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-5">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Spielplan von fussball.de importieren</h3>
+            <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
               Auf eurer Mannschaftsseite bei fussball.de den Bereich „Mannschaftsspielplan" markieren (von der ersten
               bis zur letzten Zeile mit Datum/Gegner), kopieren (Strg+C / Cmd+C) und hier einfügen. Es gibt bei
               fussball.de keine offizielle Exportfunktion – dieser Import erkennt Datum, Uhrzeit, Gegner und
@@ -1151,36 +1177,36 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             >
               <Plus size={15} /> Spielplan einlesen
             </button>
-            {importInfo && <p className="text-stone-400 text-xs mt-2">{importInfo}</p>}
+            {importInfo && <p className="text-[var(--text-secondary)] text-xs mt-2">{importInfo}</p>}
           </div>
 
           {(schedule || []).length === 0 ? (
-            <p className="text-stone-500 text-sm">Noch keine importierten Spiele.</p>
+            <p className="text-[var(--text-tertiary)] text-sm">Noch keine importierten Spiele.</p>
           ) : (
             <div className="space-y-1.5">
               {(schedule || [])
                 .slice()
                 .sort((a, b) => (a.date < b.date ? -1 : 1))
                 .map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 bg-[#122e23] border border-[#254536] rounded-lg px-3 py-2">
-                    <div className="w-24 text-xs text-stone-400 shrink-0">{formatDateDE(f.date)}</div>
-                    <div className="w-14 text-xs text-stone-400 shrink-0">{f.time || "–"}</div>
+                  <div key={f.id} className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2">
+                    <div className="w-24 text-xs text-[var(--text-secondary)] shrink-0">{formatDateDE(f.date)}</div>
+                    <div className="w-14 text-xs text-[var(--text-secondary)] shrink-0">{f.time || "–"}</div>
                     <span
                       className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                       style={{ background: (MATCH_TYPE_COLORS[f.matchType] || "#7a93a8") + "33", color: MATCH_TYPE_COLORS[f.matchType] || "#7a93a8" }}
                     >
                       {f.matchType}
                     </span>
-                    <div className="flex-1 text-sm text-white truncate">
-                      {f.opponent} <span className="text-stone-500 text-xs">({f.homeAway})</span>
+                    <div className="flex-1 text-sm text-[var(--text-primary)] truncate">
+                      {f.opponent} <span className="text-[var(--text-tertiary)] text-xs">({f.homeAway})</span>
                     </div>
                     <button
                       onClick={() => applyFixtureToGame(f)}
-                      className="text-xs font-semibold text-white bg-[#254536] hover:bg-[#2f5643] px-3 py-1.5 rounded-md shrink-0"
+                      className="text-xs font-semibold text-[var(--text-primary)] bg-[var(--border-card)] hover:bg-[#2f5643] px-3 py-1.5 rounded-md shrink-0"
                     >
                       Übernehmen
                     </button>
-                    <button onClick={() => removeFixture(f.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                    <button onClick={() => removeFixture(f.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -1195,7 +1221,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
           {/* Pitch */}
           <div className="lg:col-span-3">
             <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <span className="text-[11px] uppercase tracking-wide text-stone-400 font-semibold">
+              <span className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)] font-semibold">
                 System
               </span>
               <select
@@ -1207,7 +1233,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                   <option key={f}>{f}</option>
                 ))}
               </select>
-              <span className="text-[11px] uppercase tracking-wide text-stone-400 font-semibold ml-2">
+              <span className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)] font-semibold ml-2">
                 Spieltyp
               </span>
               <div className="flex gap-1.5">
@@ -1217,7 +1243,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                     onClick={() => setGame({ ...game, matchType: t })}
                     className={
                       "text-xs font-semibold px-2.5 py-1 rounded-full border " +
-                      (game.matchType === t ? "text-white" : "text-stone-400 border-[#254536]")
+                      (game.matchType === t ? "text-white" : "text-[var(--text-secondary)] border-[var(--border-card)]")
                     }
                     style={game.matchType === t ? { background: MATCH_TYPE_COLORS[t], borderColor: MATCH_TYPE_COLORS[t] } : {}}
                   >
@@ -1228,7 +1254,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             </div>
 
             {matchSquad.length === 0 && (
-              <p className="text-stone-500 text-xs mb-2">
+              <p className="text-[var(--text-tertiary)] text-xs mb-2">
                 Wählt zuerst rechts den Kader für diesen Spieltag – erst dann könnt ihr Spieler auf das Feld stellen.
               </p>
             )}
@@ -1290,13 +1316,13 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                     {entry && (
                       <div className="flex gap-0.5">
                         <input
-                          className="w-8 text-[10px] text-center bg-[#0f2a20]/90 border border-[#2a4a3c] rounded text-stone-200 px-0.5 py-0.5"
+                          className="w-8 text-[10px] text-center bg-[var(--bg-input)]/90 border border-[var(--border-input)] rounded text-[var(--text-body)] px-0.5 py-0.5"
                           value={entry.number}
                           onChange={(e) => setSlotField(slot.id, "number", e.target.value)}
                           placeholder="Nr"
                         />
                         <input
-                          className="w-12 text-[10px] text-center bg-[#0f2a20]/90 border border-[#2a4a3c] rounded text-stone-200 px-0.5 py-0.5"
+                          className="w-12 text-[10px] text-center bg-[var(--bg-input)]/90 border border-[var(--border-input)] rounded text-[var(--text-body)] px-0.5 py-0.5"
                           value={entry.position}
                           onChange={(e) => setSlotField(slot.id, "position", e.target.value)}
                           placeholder="Pos"
@@ -1308,21 +1334,21 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               })}
             </div>
 
-            <p className="text-stone-500 text-[11px] mt-1.5">
+            <p className="text-[var(--text-tertiary)] text-[11px] mt-1.5">
               Die gelbe „Pressing"-Linie könnt ihr auf dem Feld nach oben oder unten ziehen.
             </p>
 
             {bench.length > 0 && (
               <div className="mt-3">
-                <p className="text-[11px] uppercase tracking-wide text-stone-400 font-semibold mb-1.5">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)] font-semibold mb-1.5">
                   Bank (im Kader, nicht in der Startelf)
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {bench.map((p) => (
-                    <span key={p.id} className="flex items-center gap-1 text-xs bg-[#122e23] border border-[#254536] text-stone-300 pl-1 pr-2 py-1 rounded-full">
-                      <span className="text-stone-400">#</span>
+                    <span key={p.id} className="flex items-center gap-1 text-xs bg-[var(--bg-card)] border border-[var(--border-card)] text-[var(--text-secondary)] pl-1 pr-2 py-1 rounded-full">
+                      <span className="text-[var(--text-secondary)]">#</span>
                       <input
-                        className="w-7 bg-[#0f2a20] border border-[#2a4a3c] rounded text-center text-stone-100 py-0.5"
+                        className="w-7 bg-[var(--bg-input)] border border-[var(--border-input)] rounded text-center text-[var(--text-body)] py-0.5"
                         value={benchNumbers[p.id] ?? p.number ?? ""}
                         onChange={(e) => setBenchNumber(p.id, e.target.value)}
                       />
@@ -1337,34 +1363,34 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
           {/* Info panels */}
           <div className="lg:col-span-2 space-y-4">
             {(lastMatchOverall || headToHead) && (
-              <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-                <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+                <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center gap-2">
                   <BarChart3 size={15} className="text-[#c8102e]" /> Letztes Spiel &amp; Bilanz
                 </h3>
                 {lastMatchOverall && (
                   <div className="flex items-center gap-2 text-sm mb-1.5">
-                    <span className="text-stone-500 text-xs w-24 shrink-0">Letztes Spiel</span>
-                    <span className="text-white font-semibold tabular-nums">
+                    <span className="text-[var(--text-tertiary)] text-xs w-24 shrink-0">Letztes Spiel</span>
+                    <span className="text-[var(--text-primary)] font-semibold tabular-nums">
                       {lastMatchOverall.scoreUs}:{lastMatchOverall.scoreThem}
                     </span>
-                    <span className="text-stone-300 truncate">gegen {lastMatchOverall.opponent}</span>
-                    <span className="text-stone-500 text-xs ml-auto shrink-0">{formatDateDE(lastMatchOverall.date)}</span>
+                    <span className="text-[var(--text-secondary)] truncate">gegen {lastMatchOverall.opponent}</span>
+                    <span className="text-[var(--text-tertiary)] text-xs ml-auto shrink-0">{formatDateDE(lastMatchOverall.date)}</span>
                   </div>
                 )}
                 {headToHead && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-stone-500 text-xs w-24 shrink-0">Gegen {game.opponentName}</span>
-                    <span className="text-white font-semibold tabular-nums">
+                    <span className="text-[var(--text-tertiary)] text-xs w-24 shrink-0">Gegen {game.opponentName}</span>
+                    <span className="text-[var(--text-primary)] font-semibold tabular-nums">
                       {headToHead.scoreUs}:{headToHead.scoreThem}
                     </span>
-                    <span className="text-stone-500 text-xs ml-auto shrink-0">{formatDateDE(headToHead.date)}</span>
+                    <span className="text-[var(--text-tertiary)] text-xs ml-auto shrink-0">{formatDateDE(headToHead.date)}</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-              <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center gap-2">
                 <Shield size={15} className="text-[#c8102e]" /> Rahmendaten
               </h3>
               <Field label="Gegner">
@@ -1393,7 +1419,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                         onClick={() => setGame({ ...game, homeAway: h })}
                         className={
                           "flex-1 text-xs font-semibold px-2 py-2 rounded-md border " +
-                          (game.homeAway === h ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[#2a4a3c] text-stone-400")
+                          (game.homeAway === h ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[var(--border-input)] text-[var(--text-secondary)]")
                         }
                       >
                         {h}
@@ -1407,33 +1433,33 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               </Field>
             </div>
 
-            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-              <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center gap-2">
                 <Users size={15} className="text-[#c8102e]" /> Kader für diesen Spieltag
               </h3>
               {squad.length === 0 ? (
-                <p className="text-stone-500 text-xs">Erst Spieler im Tab „Kader" anlegen.</p>
+                <p className="text-[var(--text-tertiary)] text-xs">Erst Spieler im Tab „Kader" anlegen.</p>
               ) : (
                 <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
                   {squad.slice().sort((a,b)=>(Number(a.number)||99)-(Number(b.number)||99)).map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 text-sm text-stone-200 py-0.5 cursor-pointer">
+                    <label key={p.id} className="flex items-center gap-2 text-sm text-[var(--text-body)] py-0.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={matchSquad.includes(p.id)}
                         onChange={() => toggleMatchSquad(p.id)}
                         className="accent-[#c8102e]"
                       />
-                      <span className="w-7 text-xs text-stone-400">{p.number || "–"}</span>
+                      <span className="w-7 text-xs text-[var(--text-secondary)]">{p.number || "–"}</span>
                       <span className="flex-1 truncate">{p.name}</span>
-                      <span className="text-xs text-stone-500">{p.position}</span>
+                      <span className="text-xs text-[var(--text-tertiary)]">{p.position}</span>
                     </label>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-              <h3 className="text-white text-sm font-semibold mb-3">Über uns</h3>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Über uns</h3>
               <Field label="Rückblick / Allgemeines (z.B. wie war das letzte Spiel)">
                 <textarea rows={2} className={inputCls} value={game.reviewNotes} onChange={(e) => setGame({ ...game, reviewNotes: e.target.value })} />
               </Field>
@@ -1445,8 +1471,8 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               </Field>
             </div>
 
-            <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-              <h3 className="text-white text-sm font-semibold mb-3">Über den Gegner</h3>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Über den Gegner</h3>
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Tabellenplatz">
@@ -1462,7 +1488,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               </Field>
 
               <div className="mb-3">
-                <span className="block text-[11px] font-semibold tracking-wide uppercase text-stone-400 mb-1">
+                <span className="block text-[11px] font-semibold tracking-wide uppercase text-[var(--text-secondary)] mb-1">
                   Form (letzte 3 Spiele)
                 </span>
                 <div className="flex gap-1.5">
@@ -1478,7 +1504,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                           next[i] = cycle[next[i] || ""];
                           setGame({ ...game, opponentForm: next });
                         }}
-                        className="w-9 h-9 rounded-full text-xs font-bold text-white flex items-center justify-center border border-[#2a4a3c]"
+                        className="w-9 h-9 rounded-full text-xs font-bold text-white flex items-center justify-center border border-[var(--border-input)]"
                         style={{ background: colors[f || ""] }}
                         title="Klicken zum Wechseln: Sieg / Unentschieden / Niederlage"
                       >
@@ -1486,15 +1512,15 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                       </button>
                     );
                   })}
-                  <span className="text-stone-500 text-[11px] self-center ml-1">antippen zum Wechseln</span>
+                  <span className="text-[var(--text-tertiary)] text-[11px] self-center ml-1">antippen zum Wechseln</span>
                 </div>
               </div>
 
               {headToHead && (
-                <div className="mb-3 bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-3 py-2 flex items-center gap-2 text-sm">
-                  <span className="text-stone-400 text-xs">Letztes Spiel gegen uns:</span>
-                  <span className="text-white font-semibold tabular-nums">{headToHead.scoreUs}:{headToHead.scoreThem}</span>
-                  <span className="text-stone-500 text-xs ml-auto">{formatDateDE(headToHead.date)}</span>
+                <div className="mb-3 bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-3 py-2 flex items-center gap-2 text-sm">
+                  <span className="text-[var(--text-secondary)] text-xs">Letztes Spiel gegen uns:</span>
+                  <span className="text-[var(--text-primary)] font-semibold tabular-nums">{headToHead.scoreUs}:{headToHead.scoreThem}</span>
+                  <span className="text-[var(--text-tertiary)] text-xs ml-auto">{formatDateDE(headToHead.date)}</span>
                 </div>
               )}
 
@@ -1517,12 +1543,12 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
       {section === "nachricht" && (
         <div className="max-w-xl">
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-4">
-            <h3 className="text-white text-sm font-semibold mb-1">Vorschau</h3>
-            <p className="text-stone-500 text-[11px] mb-3">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Vorschau</h3>
+            <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
               Wird aus den Angaben in „Vorbereitung" erzeugt. Einfach kopieren und in eure WhatsApp-Gruppe einfügen.
             </p>
-            <pre className="whitespace-pre-wrap break-words bg-[#0f2a20] border border-[#2a4a3c] rounded-md p-3 text-sm text-stone-100 leading-relaxed">
+            <pre className="whitespace-pre-wrap break-words bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md p-3 text-sm text-[var(--text-body)] leading-relaxed">
               {teamMessage}
             </pre>
           </div>
@@ -1534,7 +1560,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             {copyState === "copied" ? "Kopiert!" : copyState === "failed" ? "Kopieren fehlgeschlagen – bitte manuell markieren" : "Nachricht kopieren"}
           </button>
           {matchSquad.length === 0 && (
-            <p className="text-stone-500 text-xs mt-3">
+            <p className="text-[var(--text-tertiary)] text-xs mt-3">
               Tipp: Wählt unter „Vorbereitung" zuerst den Kader für diesen Spieltag aus, damit die Spielerliste in der Nachricht erscheint.
             </p>
           )}
@@ -1543,19 +1569,19 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
       {section === "spielbericht" && (
         <div className="grid lg:grid-cols-2 gap-5">
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-            <h3 className="text-white text-sm font-semibold mb-3">Endstand</h3>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Endstand</h3>
             <div className="flex items-center gap-3">
               <input className={inputCls + " w-20 text-center"} inputMode="numeric" value={report.scoreUs} onChange={(e) => setReport({ scoreUs: e.target.value.replace(/\D/, "") })} placeholder="Wir" />
-              <span className="text-stone-400">:</span>
+              <span className="text-[var(--text-secondary)]">:</span>
               <input className={inputCls + " w-20 text-center"} inputMode="numeric" value={report.scoreThem} onChange={(e) => setReport({ scoreThem: e.target.value.replace(/\D/, "") })} placeholder="Gegner" />
-              <span className="text-xs text-stone-500">gegen {game.opponentName || "Gegner"}</span>
+              <span className="text-xs text-[var(--text-tertiary)]">gegen {game.opponentName || "Gegner"}</span>
             </div>
           </div>
 
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-            <h3 className="text-white text-sm font-semibold mb-1">Spieldauer</h3>
-            <p className="text-stone-500 text-[11px] mb-3">Für die automatische Berechnung der Spielminuten pro Spieler.</p>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Spieldauer</h3>
+            <p className="text-[var(--text-tertiary)] text-[11px] mb-3">Für die automatische Berechnung der Spielminuten pro Spieler.</p>
             <div className="flex items-center gap-2">
               <input
                 className={inputCls + " w-20 text-center"}
@@ -1563,13 +1589,13 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 value={report.matchDuration}
                 onChange={(e) => setReport({ matchDuration: e.target.value.replace(/\D/, "") })}
               />
-              <span className="text-xs text-stone-500">Minuten</span>
+              <span className="text-xs text-[var(--text-tertiary)]">Minuten</span>
             </div>
           </div>
 
           {/* Goals */}
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-            <h3 className="text-white text-sm font-semibold mb-3">Torschützen</h3>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Torschützen</h3>
             <div className="grid grid-cols-4 gap-2 mb-2">
               <select className={inputCls + " col-span-2 text-xs"} value={goalDraft.playerId} onChange={(e) => setGoalDraft({ ...goalDraft, playerId: e.target.value })}>
                 <option value="">Torschütze</option>
@@ -1586,18 +1612,18 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             </button>
             <div className="space-y-1">
               {report.goals.map((g) => (
-                <div key={g.id} className="flex items-center gap-2 text-sm text-stone-200 bg-[#0f2a20] rounded-md px-2 py-1.5">
-                  <span className="text-xs text-stone-400 w-8">{g.minute ? `${g.minute}'` : "–"}</span>
+                <div key={g.id} className="flex items-center gap-2 text-sm text-[var(--text-body)] bg-[var(--bg-input)] rounded-md px-2 py-1.5">
+                  <span className="text-xs text-[var(--text-secondary)] w-8">{g.minute ? `${g.minute}'` : "–"}</span>
                   <span className="flex-1">⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}</span>
-                  <button onClick={() => removeGoal(g.id)} className="text-stone-500 hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
+                  <button onClick={() => removeGoal(g.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Cards */}
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-            <h3 className="text-white text-sm font-semibold mb-3">Karten</h3>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Karten</h3>
             <div className="grid grid-cols-4 gap-2 mb-2">
               <select className={inputCls + " col-span-2 text-xs"} value={cardDraft.playerId} onChange={(e) => setCardDraft({ ...cardDraft, playerId: e.target.value })}>
                 <option value="">Spieler</option>
@@ -1613,19 +1639,19 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             </button>
             <div className="space-y-1">
               {report.cards.map((c) => (
-                <div key={c.id} className="flex items-center gap-2 text-sm text-stone-200 bg-[#0f2a20] rounded-md px-2 py-1.5">
-                  <span className="text-xs text-stone-400 w-8">{c.minute ? `${c.minute}'` : "–"}</span>
+                <div key={c.id} className="flex items-center gap-2 text-sm text-[var(--text-body)] bg-[var(--bg-input)] rounded-md px-2 py-1.5">
+                  <span className="text-xs text-[var(--text-secondary)] w-8">{c.minute ? `${c.minute}'` : "–"}</span>
                   <span className="w-2.5 h-3.5 rounded-sm shrink-0" style={{ background: CARD_COLORS[c.type] }} />
                   <span className="flex-1">{c.playerName} — {c.type}</span>
-                  <button onClick={() => removeCard(c.id)} className="text-stone-500 hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
+                  <button onClick={() => removeCard(c.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Subs */}
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
-            <h3 className="text-white text-sm font-semibold mb-3">Auswechslungen</h3>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Auswechslungen</h3>
             <div className="grid grid-cols-5 gap-2 mb-2">
               <select className={inputCls + " col-span-2 text-xs"} value={subDraft.outId} onChange={(e) => setSubDraft({ ...subDraft, outId: e.target.value })}>
                 <option value="">Raus</option>
@@ -1642,23 +1668,23 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             </button>
             <div className="space-y-1">
               {report.subs.map((s) => (
-                <div key={s.id} className="flex items-center gap-2 text-sm text-stone-200 bg-[#0f2a20] rounded-md px-2 py-1.5">
-                  <span className="text-xs text-stone-400 w-8">{s.minute ? `${s.minute}'` : "–"}</span>
+                <div key={s.id} className="flex items-center gap-2 text-sm text-[var(--text-body)] bg-[var(--bg-input)] rounded-md px-2 py-1.5">
+                  <span className="text-xs text-[var(--text-secondary)] w-8">{s.minute ? `${s.minute}'` : "–"}</span>
                   <span className="flex-1">⇄ {s.outName} raus, {s.inName} rein</span>
-                  <button onClick={() => removeSub(s.id)} className="text-stone-500 hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
+                  <button onClick={() => removeSub(s.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 lg:col-span-2">
-            <h3 className="text-white text-sm font-semibold mb-2">Im Kader, aber nicht eingesetzt</h3>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 lg:col-span-2">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-2">Im Kader, aber nicht eingesetzt</h3>
             {unusedPlayers.length === 0 ? (
-              <p className="text-stone-500 text-xs">Alle nominierten Spieler kamen zum Einsatz.</p>
+              <p className="text-[var(--text-tertiary)] text-xs">Alle nominierten Spieler kamen zum Einsatz.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {unusedPlayers.map((p) => (
-                  <span key={p.id} className="text-xs bg-[#0f2a20] border border-[#2a4a3c] text-stone-300 px-2 py-1 rounded-full">
+                  <span key={p.id} className="text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-secondary)] px-2 py-1 rounded-full">
                     {p.number ? `#${p.number} ` : ""}{p.name}
                   </span>
                 ))}
@@ -1752,7 +1778,7 @@ function StatsTab({ matches, setMatches }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h2 className="text-white text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+      <h2 className="text-[var(--text-primary)] text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
         STATISTIK
       </h2>
 
@@ -1766,7 +1792,7 @@ function StatsTab({ matches, setMatches }) {
             onClick={() => setView(id)}
             className={
               "text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors " +
-              (view === id ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[#254536] text-stone-400 hover:text-stone-200")
+              (view === id ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-body)]")
             }
           >
             {label}
@@ -1776,17 +1802,17 @@ function StatsTab({ matches, setMatches }) {
 
       {view === "spieler" && (
         <div>
-          <p className="text-stone-500 text-xs mb-4">
+          <p className="text-[var(--text-tertiary)] text-xs mb-4">
             Automatisch aus den Spielberichten zusammengezählt (Spielminuten aus Startelf + Auswechslungen berechnet).
             Über „Spiel manuell eintragen" hinzugefügte Ergebnisse ohne Spielbericht fließen hier nicht ein.
           </p>
           {playerStats.length === 0 ? (
-            <p className="text-stone-500 text-sm">Noch keine Spielerdaten – erst einen Spielbericht abschließen.</p>
+            <p className="text-[var(--text-tertiary)] text-sm">Noch keine Spielerdaten – erst einen Spielbericht abschließen.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wide text-stone-400 border-b border-[#254536]">
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-[var(--text-secondary)] border-b border-[var(--border-card)]">
                     <th className="py-2 pr-2">Spieler</th>
                     <th className="py-2 px-2 text-center">Sp.</th>
                     <th className="py-2 px-2 text-center">Min.</th>
@@ -1799,11 +1825,11 @@ function StatsTab({ matches, setMatches }) {
                 </thead>
                 <tbody>
                   {playerStats.map((p, i) => (
-                    <tr key={i} className="border-b border-[#1c3a2c] text-stone-200">
+                    <tr key={i} className="border-b border-[#1c3a2c] text-[var(--text-body)]">
                       <td className="py-2 pr-2">{p.name}</td>
                       <td className="py-2 px-2 text-center tabular-nums">{p.apps}</td>
                       <td className="py-2 px-2 text-center tabular-nums">{p.minutes}</td>
-                      <td className="py-2 px-2 text-center tabular-nums font-semibold text-white">{p.goals}</td>
+                      <td className="py-2 px-2 text-center tabular-nums font-semibold text-[var(--text-primary)]">{p.goals}</td>
                       <td className="py-2 px-2 text-center tabular-nums">{p.assists}</td>
                       <td className="py-2 px-2 text-center tabular-nums">{p.yellow}</td>
                       <td className="py-2 px-2 text-center tabular-nums">{p.yellowRed}</td>
@@ -1826,7 +1852,7 @@ function StatsTab({ matches, setMatches }) {
             onClick={() => setFilter(t)}
             className={
               "text-xs font-semibold px-3 py-1.5 rounded-full border " +
-              (filter === t ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[#254536] text-stone-400 hover:text-stone-200")
+              (filter === t ? "bg-[#c8102e] border-[#c8102e] text-white" : "border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-body)]")
             }
           >
             {t}
@@ -1843,17 +1869,17 @@ function StatsTab({ matches, setMatches }) {
           ["Gegentore", summary.ga, "#e8e6df"],
           ["Diff.", (summary.diff > 0 ? "+" : "") + summary.diff, "#e8e6df"],
         ].map(([label, val, color]) => (
-          <div key={label} className="bg-[#122e23] border border-[#254536] rounded-lg py-3 text-center">
+          <div key={label} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg py-3 text-center">
             <div className="text-xl font-bold" style={{ color, fontFamily: "'Oswald', sans-serif" }}>
               {val}
             </div>
-            <div className="text-[10px] uppercase tracking-wide text-stone-400 mt-0.5">{label}</div>
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mt-0.5">{label}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
-        <h3 className="text-white text-sm font-semibold mb-3">Spiel manuell eintragen</h3>
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+        <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Spiel manuell eintragen</h3>
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-3">
           <input type="date" className={inputCls} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
           <input className={inputCls + " sm:col-span-2"} placeholder="Gegner" value={draft.opponent} onChange={(e) => setDraft({ ...draft, opponent: e.target.value })} />
@@ -1867,13 +1893,13 @@ function StatsTab({ matches, setMatches }) {
         <button onClick={addMatch} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md">
           <Plus size={15} /> Ergebnis speichern
         </button>
-        <p className="text-stone-500 text-[11px] mt-2">
+        <p className="text-[var(--text-tertiary)] text-[11px] mt-2">
           Ausführliche Spielberichte (Torschützen, Karten, Wechsel) trägt ihr am besten direkt im Tab „Aktuelles Spiel" unter „Spielbericht" ein.
         </p>
       </div>
 
       {sorted.length === 0 ? (
-        <p className="text-stone-500 text-sm">Noch keine Spiele erfasst.</p>
+        <p className="text-[var(--text-tertiary)] text-sm">Noch keine Spiele erfasst.</p>
       ) : (
         <div className="space-y-1.5">
           {sorted.map((m) => {
@@ -1882,33 +1908,33 @@ function StatsTab({ matches, setMatches }) {
             const hasDetails = (m.goals?.length || m.cards?.length || m.subs?.length || m.unused?.length);
             const isOpen = expanded[m.id];
             return (
-              <div key={m.id} className="bg-[#122e23] border border-[#254536] rounded-lg overflow-hidden">
+              <div key={m.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg overflow-hidden">
                 <div className="flex items-center gap-3 px-3 py-2">
                   <div className="w-1.5 h-8 rounded-full shrink-0" style={{ background: outcome }} />
-                  <div className="w-20 text-xs text-stone-400 shrink-0">{m.date || "–"}</div>
+                  <div className="w-20 text-xs text-[var(--text-secondary)] shrink-0">{m.date || "–"}</div>
                   <span
                     className="hidden sm:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                     style={{ background: (MATCH_TYPE_COLORS[m.matchType] || "#7a93a8") + "33", color: MATCH_TYPE_COLORS[m.matchType] || "#7a93a8" }}
                   >
                     {m.matchType || "Liga"}
                   </span>
-                  <div className="flex-1 text-sm text-white truncate">{m.opponent}</div>
-                  <div className="text-sm font-bold text-white tabular-nums">{m.scoreUs} : {m.scoreThem}</div>
+                  <div className="flex-1 text-sm text-[var(--text-primary)] truncate">{m.opponent}</div>
+                  <div className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{m.scoreUs} : {m.scoreThem}</div>
                   {hasDetails ? (
-                    <button onClick={() => toggleExpand(m.id)} className="text-stone-400 hover:text-white shrink-0">
+                    <button onClick={() => toggleExpand(m.id)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] shrink-0">
                       <ChevronRight size={16} className={"transition-transform " + (isOpen ? "rotate-90" : "")} />
                     </button>
                   ) : <span className="w-4 shrink-0" />}
-                  <button onClick={() => removeMatch(m.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                  <button onClick={() => removeMatch(m.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0">
                     <Trash2 size={15} />
                   </button>
                 </div>
                 {isOpen && (
-                  <div className="border-t border-[#254536] px-4 py-3 text-xs text-stone-300 space-y-2">
-                    {m.notes && <p className="text-stone-400">{m.notes}</p>}
+                  <div className="border-t border-[var(--border-card)] px-4 py-3 text-xs text-[var(--text-secondary)] space-y-2">
+                    {m.notes && <p className="text-[var(--text-secondary)]">{m.notes}</p>}
                     {m.goals?.length > 0 && (
                       <div>
-                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Tore</p>
+                        <p className="text-[var(--text-tertiary)] uppercase tracking-wide text-[10px] mb-1">Tore</p>
                         {m.goals.map((g) => (
                           <p key={g.id}>{g.minute ? `${g.minute}' ` : ""}⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}</p>
                         ))}
@@ -1916,7 +1942,7 @@ function StatsTab({ matches, setMatches }) {
                     )}
                     {m.cards?.length > 0 && (
                       <div>
-                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Karten</p>
+                        <p className="text-[var(--text-tertiary)] uppercase tracking-wide text-[10px] mb-1">Karten</p>
                         {m.cards.map((c) => (
                           <p key={c.id}>{c.minute ? `${c.minute}' ` : ""}{c.playerName} — {c.type}</p>
                         ))}
@@ -1924,7 +1950,7 @@ function StatsTab({ matches, setMatches }) {
                     )}
                     {m.subs?.length > 0 && (
                       <div>
-                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Wechsel</p>
+                        <p className="text-[var(--text-tertiary)] uppercase tracking-wide text-[10px] mb-1">Wechsel</p>
                         {m.subs.map((s) => (
                           <p key={s.id}>{s.minute ? `${s.minute}' ` : ""}⇄ {s.outName} raus, {s.inName} rein</p>
                         ))}
@@ -1932,7 +1958,7 @@ function StatsTab({ matches, setMatches }) {
                     )}
                     {m.unused?.length > 0 && (
                       <div>
-                        <p className="text-stone-500 uppercase tracking-wide text-[10px] mb-1">Im Kader, nicht eingesetzt</p>
+                        <p className="text-[var(--text-tertiary)] uppercase tracking-wide text-[10px] mb-1">Im Kader, nicht eingesetzt</p>
                         <p>{m.unused.join(", ")}</p>
                       </div>
                     )}
@@ -1969,15 +1995,15 @@ function InfoTab({ creds, setCreds }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h2 className="text-white text-xl mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>
+      <h2 className="text-[var(--text-primary)] text-xl mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>
         INFO &amp; ZUGÄNGE
       </h2>
-      <p className="text-stone-500 text-xs mb-4">
+      <p className="text-[var(--text-tertiary)] text-xs mb-4">
         Logins, Portale, Verbandslinks etc. Nur unverschlüsselt gespeichert – für sensible Konten
         besser einen echten Passwort-Manager nutzen.
       </p>
 
-      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
         <div className="grid grid-cols-2 gap-3 mb-3">
           <input className={inputCls} placeholder="Dienst / Portal" value={draft.service} onChange={(e) => setDraft({ ...draft, service: e.target.value })} />
           <input className={inputCls} placeholder="Benutzername" value={draft.username} onChange={(e) => setDraft({ ...draft, username: e.target.value })} />
@@ -1990,25 +2016,25 @@ function InfoTab({ creds, setCreds }) {
       </div>
 
       {creds.length === 0 ? (
-        <p className="text-stone-500 text-sm">Noch keine Zugänge gespeichert.</p>
+        <p className="text-[var(--text-tertiary)] text-sm">Noch keine Zugänge gespeichert.</p>
       ) : (
         <div className="space-y-2">
           {creds.map((c) => (
-            <div key={c.id} className="bg-[#122e23] border border-[#254536] rounded-lg p-3">
+            <div key={c.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-3">
               <div className="flex items-center gap-2 mb-2">
                 <KeyRound size={14} className="text-[#c8102e] shrink-0" />
                 <input
-                  className="bg-transparent text-sm font-semibold text-white flex-1 min-w-0 focus:outline-none"
+                  className="bg-transparent text-sm font-semibold text-[var(--text-primary)] flex-1 min-w-0 focus:outline-none"
                   value={c.service}
                   onChange={(e) => update(c.id, "service", e.target.value)}
                 />
-                <button onClick={() => remove(c.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                <button onClick={() => remove(c.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0">
                   <Trash2 size={15} />
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2 pl-6">
                 <input
-                  className="bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-2 py-1.5 text-xs text-stone-200 focus:outline-none"
+                  className="bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-2 py-1.5 text-xs text-[var(--text-body)] focus:outline-none"
                   placeholder="Benutzername"
                   value={c.username}
                   onChange={(e) => update(c.id, "username", e.target.value)}
@@ -2016,20 +2042,20 @@ function InfoTab({ creds, setCreds }) {
                 <div className="relative">
                   <input
                     type={visible[c.id] ? "text" : "password"}
-                    className="w-full bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-2 py-1.5 pr-8 text-xs text-stone-200 focus:outline-none"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-2 py-1.5 pr-8 text-xs text-[var(--text-body)] focus:outline-none"
                     placeholder="Passwort"
                     value={c.password}
                     onChange={(e) => update(c.id, "password", e.target.value)}
                   />
                   <button
                     onClick={() => toggle(c.id)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-500"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
                   >
                     {visible[c.id] ? <EyeOff size={13} /> : <Eye size={13} />}
                   </button>
                 </div>
                 <input
-                  className="col-span-2 bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-2 py-1.5 text-xs text-stone-400 focus:outline-none"
+                  className="col-span-2 bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-2 py-1.5 text-xs text-[var(--text-secondary)] focus:outline-none"
                   placeholder="Notiz"
                   value={c.notes}
                   onChange={(e) => update(c.id, "notes", e.target.value)}
@@ -2054,6 +2080,123 @@ const TABS = [
   { id: "info", label: "Info", icon: KeyRound },
 ];
 
+/* ---------------------------------------------------------------------- */
+/*  Präsentationsmodus (für TV / Beamer am Spieltag)                       */
+/* ---------------------------------------------------------------------- */
+
+function PresentationView({ squad, game, onExit }) {
+  useEffect(() => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    }
+    const onKey = (e) => {
+      if (e.key === "Escape") onExit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const slots = FORMATIONS[game.formation] || FORMATIONS["4-4-2"];
+  const lineup = game.lineup || {};
+  const matchSquad = game.matchSquad || [];
+  const assignedIds = Object.values(lineup).map((v) => v?.playerId).filter(Boolean);
+  const getPlayer = (id) => squad.find((p) => p.id === id);
+  const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative">
+      <button
+        onClick={onExit}
+        className="absolute top-6 right-6 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md px-3 py-2 text-sm flex items-center gap-1.5"
+      >
+        <X size={16} /> Beenden (Esc)
+      </button>
+
+      <div className="flex items-center gap-5 mb-8">
+        <ClubCrest size={72} />
+        <div>
+          <h1 className="text-[var(--text-primary)] text-3xl font-bold tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            TUS HAREN 2 {game.opponentName ? `vs. ${game.opponentName}` : ""}
+          </h1>
+          <div className="flex flex-wrap gap-4 mt-1 text-[var(--text-secondary)] text-lg">
+            {game.date && <span>{formatDateDE(game.date)}</span>}
+            {game.kickoff && <span>{game.kickoff} Uhr</span>}
+            <span
+              className="text-sm font-semibold px-3 py-1 rounded-full"
+              style={{ background: (MATCH_TYPE_COLORS[game.matchType] || "#7a93a8") + "33", color: MATCH_TYPE_COLORS[game.matchType] || "#7a93a8" }}
+            >
+              {game.matchType}
+            </span>
+            <span>{game.homeAway === "Heim" ? "Heimspiel" : "Auswärtsspiel"}</span>
+            {game.meetingTime && <span>Treffpunkt: {game.meetingTime}</span>}
+            {game.jerseyColor && <span>Trikot: {game.jerseyColor}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <div
+            className="relative w-full max-w-xl mx-auto rounded-xl border-2 border-[#e8e6df]/30 overflow-hidden"
+            style={{
+              aspectRatio: "0.68",
+              background: "repeating-linear-gradient(to bottom, #1c5238 0, #1c5238 11.11%, #1a4a32 11.11%, #1a4a32 22.22%)",
+            }}
+          >
+            <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
+            <div className="absolute top-1/2 left-3 right-3 h-px bg-white/25 -translate-y-1/2 pointer-events-none" />
+            <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
+            <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
+
+            {slots.map((slot) => {
+              const entry = lineup[slot.id];
+              const p = entry ? getPlayer(entry.playerId) : null;
+              return (
+                <div
+                  key={slot.id}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                  style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                >
+                  <div className="bg-white/95 border-2 border-[#c8102e] rounded-full px-2.5 py-1 shadow text-center min-w-[80px]">
+                    <div className="text-[#122e23] font-bold text-sm leading-tight">{p ? p.name : slot.label}</div>
+                    {p && <div className="text-[#c8102e] text-[10px] font-semibold">#{entry.number || p.number || "–"}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-[var(--text-primary)] text-lg font-semibold mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            Bank
+          </h2>
+          {bench.length === 0 ? (
+            <p className="text-[var(--text-tertiary)] text-sm">Keine Bankspieler eingetragen.</p>
+          ) : (
+            <div className="space-y-2">
+              {bench.map((p) => (
+                <div key={p.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2 flex items-center gap-2">
+                  <span className="text-[var(--text-tertiary)] text-sm w-6">{p.number || "–"}</span>
+                  <span className="text-[var(--text-primary)] text-base">{p.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
@@ -2077,7 +2220,7 @@ export default function App() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center text-stone-400 text-sm">
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center text-[var(--text-secondary)] text-sm">
         Lädt …
       </div>
     );
@@ -2087,36 +2230,36 @@ export default function App() {
 
   if (!allLoaded) {
     return (
-      <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center text-stone-400 text-sm">
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center text-[var(--text-secondary)] text-sm">
         Lädt Daten …
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1f18]" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <header className="border-b border-[#254536] px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg-page)]" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <header className="border-b border-[var(--border-card)] px-4 sm:px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ClubCrest size={36} />
           <div>
-            <h1 className="text-white text-lg leading-tight tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            <h1 className="text-[var(--text-primary)] text-lg leading-tight tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
               TUS HAREN 2
             </h1>
-            <p className="text-stone-500 text-[11px] uppercase tracking-widest leading-tight">Spielvorbereitung</p>
+            <p className="text-[var(--text-tertiary)] text-[11px] uppercase tracking-widest leading-tight">Spielvorbereitung</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden sm:block text-xs text-stone-400">{user.email}</span>
+          <span className="hidden sm:block text-xs text-[var(--text-secondary)]">{user.email}</span>
           <button
             onClick={() => signOut(auth)}
-            className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-white border border-[#254536] rounded-md px-2.5 py-1.5"
+            className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md px-2.5 py-1.5"
           >
             <LogOut size={13} /> Abmelden
           </button>
         </div>
       </header>
 
-      <nav className="flex overflow-x-auto border-b border-[#254536] px-2 sm:px-6">
+      <nav className="flex overflow-x-auto border-b border-[var(--border-card)] px-2 sm:px-6">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -2126,7 +2269,7 @@ export default function App() {
               onClick={() => setTab(t.id)}
               className={
                 "flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors " +
-                (active ? "border-[#c8102e] text-white" : "border-transparent text-stone-400 hover:text-stone-200")
+                (active ? "border-[#c8102e] text-[var(--text-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-body)]")
               }
             >
               <Icon size={15} /> {t.label}
