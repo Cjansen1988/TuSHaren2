@@ -294,56 +294,173 @@ const inputCls =
   "w-full bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-3 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#c8102e] focus:border-transparent";
 
 /* ---------------------------------------------------------------------- */
-/*  Password gate                                                          */
+/*  Formation definitions (x/y in % of pitch, y=0 own goal, y=100 attack)  */
 /* ---------------------------------------------------------------------- */
 
-function PasswordGate({ onUnlock }) {
-  const [hasPassword, setHasPassword] = useState(null);
-  const [pw, setPw] = useState("");
-  const [pw2, setPw2] = useState("");
-  const [error, setError] = useState("");
-  const [show, setShow] = useState(false);
+const FORMATIONS = {
+  "4-4-2": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 14, y: 72 },
+    { id: "IV1", label: "IV", x: 36, y: 78 },
+    { id: "IV2", label: "IV", x: 64, y: 78 },
+    { id: "RV", label: "RV", x: 86, y: 72 },
+    { id: "LM", label: "LM", x: 14, y: 46 },
+    { id: "ZM1", label: "ZM", x: 37, y: 50 },
+    { id: "ZM2", label: "ZM", x: 63, y: 50 },
+    { id: "RM", label: "RM", x: 86, y: 46 },
+    { id: "ST1", label: "ST", x: 36, y: 16 },
+    { id: "ST2", label: "ST", x: 64, y: 16 },
+  ],
+  "4-3-3": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 14, y: 72 },
+    { id: "IV1", label: "IV", x: 36, y: 78 },
+    { id: "IV2", label: "IV", x: 64, y: 78 },
+    { id: "RV", label: "RV", x: 86, y: 72 },
+    { id: "ZM1", label: "ZM", x: 30, y: 52 },
+    { id: "ZM2", label: "ZM", x: 50, y: 57 },
+    { id: "ZM3", label: "ZM", x: 70, y: 52 },
+    { id: "LA", label: "LA", x: 15, y: 20 },
+    { id: "ST", label: "ST", x: 50, y: 12 },
+    { id: "RA", label: "RA", x: 85, y: 20 },
+  ],
+  "4-2-3-1": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 14, y: 72 },
+    { id: "IV1", label: "IV", x: 36, y: 78 },
+    { id: "IV2", label: "IV", x: 64, y: 78 },
+    { id: "RV", label: "RV", x: 86, y: 72 },
+    { id: "DM1", label: "DM", x: 36, y: 58 },
+    { id: "DM2", label: "DM", x: 64, y: 58 },
+    { id: "OML", label: "OM", x: 20, y: 35 },
+    { id: "OMZ", label: "OM", x: 50, y: 38 },
+    { id: "OMR", label: "OM", x: 80, y: 35 },
+    { id: "ST", label: "ST", x: 50, y: 14 },
+  ],
+  "3-5-2": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "IV1", label: "IV", x: 25, y: 76 },
+    { id: "IV2", label: "IV", x: 50, y: 80 },
+    { id: "IV3", label: "IV", x: 75, y: 76 },
+    { id: "LM", label: "LM", x: 10, y: 50 },
+    { id: "ZM1", label: "ZM", x: 32, y: 55 },
+    { id: "ZM2", label: "ZM", x: 50, y: 58 },
+    { id: "ZM3", label: "ZM", x: 68, y: 55 },
+    { id: "RM", label: "RM", x: 90, y: 50 },
+    { id: "ST1", label: "ST", x: 36, y: 16 },
+    { id: "ST2", label: "ST", x: 64, y: 16 },
+  ],
+  "3-4-3": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "IV1", label: "IV", x: 25, y: 76 },
+    { id: "IV2", label: "IV", x: 50, y: 80 },
+    { id: "IV3", label: "IV", x: 75, y: 76 },
+    { id: "LM", label: "LM", x: 15, y: 50 },
+    { id: "ZM1", label: "ZM", x: 38, y: 56 },
+    { id: "ZM2", label: "ZM", x: 62, y: 56 },
+    { id: "RM", label: "RM", x: 85, y: 50 },
+    { id: "LA", label: "LA", x: 20, y: 20 },
+    { id: "ST", label: "ST", x: 50, y: 12 },
+    { id: "RA", label: "RA", x: 80, y: 20 },
+  ],
+  "5-3-2": [
+    { id: "TW", label: "TW", x: 50, y: 92 },
+    { id: "LV", label: "LV", x: 10, y: 66 },
+    { id: "IV1", label: "IV", x: 30, y: 76 },
+    { id: "IV2", label: "IV", x: 50, y: 80 },
+    { id: "IV3", label: "IV", x: 70, y: 76 },
+    { id: "RV", label: "RV", x: 90, y: 66 },
+    { id: "ZM1", label: "ZM", x: 30, y: 50 },
+    { id: "ZM2", label: "ZM", x: 50, y: 55 },
+    { id: "ZM3", label: "ZM", x: 70, y: 50 },
+    { id: "ST1", label: "ST", x: 36, y: 16 },
+    { id: "ST2", label: "ST", x: 64, y: 16 },
+  ],
+};
 
-  useEffect(() => {
-    (async () => {
-      const stored = await loadKey("app-password", null);
-      setHasPassword(!!stored);
-    })();
-  }, []);
+/* ---------------------------------------------------------------------- */
+/*  Spiel-Konstanten                                                       */
+/* ---------------------------------------------------------------------- */
+
+const emptyGame = {
+  matchType: "Liga",
+  formation: "4-4-2",
+  matchSquad: [],
+  lineup: {},
+  benchNumbers: {},
+  date: "",
+  kickoff: "",
+  meetingTime: "",
+  homeAway: "Heim",
+  jerseyColor: "",
+  location: "",
+  opponentName: "",
+  ourNotes: "",
+  ourTactics: "",
+  opponentFormation: "",
+  opponentStrengths: "",
+  opponentWeaknesses: "",
+  opponentKeyPlayers: "",
+  report: {
+    scoreUs: "",
+    scoreThem: "",
+    matchDuration: "90",
+    goals: [],
+    cards: [],
+    subs: [],
+  },
+};
+
+const MATCH_TYPES = ["Liga", "Pokal", "Testspiel"];
+const MATCH_TYPE_COLORS = { Liga: "#3fae6b", Pokal: "#c8a13f", Testspiel: "#7a93a8" };
+const CARD_TYPES = ["Gelb", "Gelb-Rot", "Rot"];
+const CARD_COLORS = { Gelb: "#e7c246", "Gelb-Rot": "#e08a2e", Rot: "#c8102e" };
+
+/* ---------------------------------------------------------------------- */
+/*  Auth gate -- Firebase email/password login for the two trainers        */
+/* ---------------------------------------------------------------------- */
+
+function AuthGate({ onAuthed }) {
+  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (hasPassword) {
-      const stored = await loadKey("app-password", null);
-      if (pw === stored) {
-        onUnlock();
+    setError("");
+    if (!email.trim() || password.length < 6) {
+      setError("E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (mode === "signin") {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
       } else {
-        setError("Falsches Passwort.");
+        await createUserWithEmailAndPassword(auth, email.trim(), password);
       }
-    } else {
-      if (pw.length < 4) {
-        setError("Mindestens 4 Zeichen.");
-        return;
-      }
-      if (pw !== pw2) {
-        setError("Passwörter stimmen nicht überein.");
-        return;
-      }
-      await saveKey("app-password", pw);
-      onUnlock();
+      onAuthed();
+    } catch (err) {
+      const map = {
+        "auth/invalid-credential": "E-Mail oder Passwort falsch.",
+        "auth/wrong-password": "E-Mail oder Passwort falsch.",
+        "auth/user-not-found": "Kein Konto mit dieser E-Mail gefunden.",
+        "auth/email-already-in-use": "Für diese E-Mail existiert bereits ein Konto.",
+        "auth/weak-password": "Passwort ist zu schwach (mind. 6 Zeichen).",
+        "auth/invalid-email": "Ungültige E-Mail-Adresse.",
+      };
+      setError(map[err.code] || "Etwas ist schiefgelaufen. Bitte erneut versuchen.");
+    } finally {
+      setBusy(false);
     }
   };
 
-  if (hasPassword === null) {
-    return (
-      <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center text-stone-400 text-sm">
-        Lädt …
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#0b1f18] flex items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute inset-0 opacity-[0.05] pointer-events-none"
+      <div
+        className="absolute inset-0 opacity-[0.05] pointer-events-none"
         style={{
           backgroundImage:
             "repeating-linear-gradient(0deg, transparent, transparent 39px, #fff 39px, #fff 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, #fff 39px, #fff 40px)",
@@ -352,44 +469,38 @@ function PasswordGate({ onUnlock }) {
       <div className="relative w-full max-w-sm bg-[#122e23] border border-[#254536] rounded-xl p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-6">
           <ClubCrest size={56} />
-          <h1
-            className="text-2xl text-white tracking-wide mt-3"
-            style={{ fontFamily: "'Oswald', sans-serif" }}
-          >
+          <h1 className="text-2xl text-white tracking-wide mt-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
             TUS HAREN 2
           </h1>
           <p className="text-stone-400 text-xs mt-1 uppercase tracking-widest flex items-center gap-1.5">
-            <Lock size={11} /> {hasPassword ? "Zugang" : "Passwort festlegen"}
+            <Lock size={11} /> {mode === "signin" ? "Anmelden" : "Konto erstellen"}
           </p>
+        </div>
+
+        <div className="relative mb-3">
+          <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="E-Mail"
+            className={inputCls + " pl-9"}
+          />
         </div>
 
         <div className="relative mb-3">
           <input
             type={show ? "text" : "password"}
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="Passwort"
             className={inputCls + " pr-10"}
-            onKeyDown={(e) => e.key === "Enter" && !hasPassword === false && submit()}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
           />
-          <button
-            type="button"
-            onClick={() => setShow((s) => !s)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
-          >
+          <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-
-        {!hasPassword && (
-          <input
-            type={show ? "text" : "password"}
-            value={pw2}
-            onChange={(e) => setPw2(e.target.value)}
-            placeholder="Passwort wiederholen"
-            className={inputCls + " mb-3"}
-          />
-        )}
 
         {error && (
           <div className="flex items-center gap-2 text-[#ff8a8a] text-xs mb-3">
@@ -399,18 +510,18 @@ function PasswordGate({ onUnlock }) {
 
         <button
           onClick={submit}
-          className="w-full bg-[#c8102e] hover:bg-[#a80d26] transition-colors text-white font-semibold py-2.5 rounded-md text-sm tracking-wide"
+          disabled={busy}
+          className="w-full bg-[#c8102e] hover:bg-[#a80d26] disabled:opacity-60 transition-colors text-white font-semibold py-2.5 rounded-md text-sm tracking-wide"
         >
-          {hasPassword ? "Anmelden" : "Passwort speichern & starten"}
+          {busy ? "Einen Moment …" : mode === "signin" ? "Anmelden" : "Konto erstellen & starten"}
         </button>
 
-        {!hasPassword && (
-          <p className="text-stone-500 text-[11px] mt-4 leading-relaxed">
-            Dieses Passwort wird für beide Trainer geteilt und einfach als Text
-            gespeichert – kein Ersatz für einen echten Passwort-Manager, aber
-            ausreichend, um Neugierige fernzuhalten.
-          </p>
-        )}
+        <button
+          onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}
+          className="w-full text-center text-stone-400 hover:text-stone-200 text-xs mt-4"
+        >
+          {mode === "signin" ? "Noch kein Konto? Hier erstellen" : "Schon ein Konto? Hier anmelden"}
+        </button>
       </div>
     </div>
   );
@@ -419,6 +530,7 @@ function PasswordGate({ onUnlock }) {
 /* ---------------------------------------------------------------------- */
 /*  Tab: Kader                                                              */
 /* ---------------------------------------------------------------------- */
+
 
 const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Flügel", "ST"];
 
