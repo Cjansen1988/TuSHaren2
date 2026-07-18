@@ -2156,6 +2156,18 @@ function PresentationView({ squad, game, onExit }) {
             <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
             <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
 
+            <div
+              className="absolute left-0 right-0 border-t-2 border-dashed pointer-events-none"
+              style={{ top: `${game.pressingLine ?? 50}%`, borderColor: "#ffd54a" }}
+            >
+              <div
+                className="absolute left-2 -translate-y-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: "#ffd54a", color: "#122e23" }}
+              >
+                Pressing
+              </div>
+            </div>
+
             {slots.map((slot) => {
               const entry = lineup[slot.id];
               const p = entry ? getPlayer(entry.playerId) : null;
@@ -2190,6 +2202,105 @@ function PresentationView({ squad, game, onExit }) {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8 mt-8">
+        <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-6">
+          <h2 className="text-[var(--text-primary)] text-xl font-semibold mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            Über {game.opponentName || "den Gegner"}
+          </h2>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            {game.opponentTablePosition && (
+              <div>
+                <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Tabellenplatz</div>
+                <div className="text-[var(--text-primary)] text-lg font-semibold">{game.opponentTablePosition}</div>
+              </div>
+            )}
+            {game.opponentGoalDiff && (
+              <div>
+                <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Torverhältnis</div>
+                <div className="text-[var(--text-primary)] text-lg font-semibold">{game.opponentGoalDiff}</div>
+              </div>
+            )}
+          </div>
+          {game.opponentForm && game.opponentForm.some(Boolean) && (
+            <div className="mb-4">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide mb-1.5">Form (letzte 3 Spiele)</div>
+              <div className="flex gap-2">
+                {game.opponentForm.map((f, i) => {
+                  const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
+                  const labels = { S: "S", U: "U", N: "N", "": "–" };
+                  return (
+                    <div
+                      key={i}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                      style={{ background: colors[f || ""] }}
+                    >
+                      {labels[f || ""]}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {game.opponentFormation && (
+            <div className="mb-3">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Vermutetes System</div>
+              <div className="text-[var(--text-body)] text-base">{game.opponentFormation}</div>
+            </div>
+          )}
+          {game.opponentKeyPlayers && (
+            <div className="mb-3">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Schlüsselspieler</div>
+              <div className="text-[var(--text-body)] text-base">{game.opponentKeyPlayers}</div>
+            </div>
+          )}
+          {game.opponentTopScorers && (
+            <div className="mb-3">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Top-Torschützen</div>
+              <div className="text-[var(--text-body)] text-base whitespace-pre-line">{game.opponentTopScorers}</div>
+            </div>
+          )}
+          {game.opponentStrengths && (
+            <div className="mb-3">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Stärken</div>
+              <div className="text-[var(--text-body)] text-base">{game.opponentStrengths}</div>
+            </div>
+          )}
+          {game.opponentWeaknesses && (
+            <div>
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Schwächen</div>
+              <div className="text-[var(--text-body)] text-base">{game.opponentWeaknesses}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-6">
+          <h2 className="text-[var(--text-primary)] text-xl font-semibold mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            Unsere Taktik
+          </h2>
+          {game.ourTactics && (
+            <div className="mb-3">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Taktische Idee</div>
+              <div className="text-[var(--text-body)] text-base">{game.ourTactics}</div>
+            </div>
+          )}
+          {game.ourNotes && (
+            <div className="mb-3">
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Ausfälle / Sonstiges</div>
+              <div className="text-[var(--text-body)] text-base">{game.ourNotes}</div>
+            </div>
+          )}
+          {game.reviewNotes && (
+            <div>
+              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Rückblick</div>
+              <div className="text-[var(--text-body)] text-base">{game.reviewNotes}</div>
+            </div>
+          )}
+          {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
+            <p className="text-[var(--text-tertiary)] text-sm">Noch keine Angaben unter „Über uns" eingetragen.</p>
           )}
         </div>
       </div>
