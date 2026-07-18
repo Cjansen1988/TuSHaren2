@@ -168,21 +168,56 @@ function initials(fullName) {
 }
 
 function computePlayerStats(playerId, matches) {
-  let apps = 0, minutes = 0, goals = 0, assists = 0;
-  (matches || []).forEach((m) => {
-    (m.appearances || []).forEach((a) => {
-      if (a.id === playerId) {
-        apps += 1;
-        minutes += Number(a.minutes) || 0;
-      }
+  let apps = 0, minutes = 0, goals = 0, assists = 0, yellow = 0, red = 0;
+  (matches || [])
+    .filter((m) => (m.matchType || "Liga") === "Liga")
+    .forEach((m) => {
+      (m.appearances || []).forEach((a) => {
+        if (a.id === playerId) {
+          apps += 1;
+          minutes += Number(a.minutes) || 0;
+        }
+      });
+      (m.goals || []).forEach((g) => {
+        if (g.playerId === playerId) goals += 1;
+        if (g.assistId === playerId) assists += 1;
+      });
+      (m.cards || []).forEach((c) => {
+        if (c.playerId === playerId) {
+          if (c.type === "Gelb") yellow += 1;
+          else red += 1;
+        }
+      });
     });
-    (m.goals || []).forEach((g) => {
-      if (g.playerId === playerId) goals += 1;
-      if (g.assistId === playerId) assists += 1;
-    });
-  });
   const avgMinutes = apps > 0 ? Math.round(minutes / apps) : 0;
-  return { apps, minutes, avgMinutes, goals, assists };
+  const contributions = goals + assists;
+  const scorerPerGame = apps > 0 ? Math.round((contributions / apps) * 100) / 100 : 0;
+  const minutesPerScorer = contributions > 0 ? Math.round(minutes / contributions) : null;
+  return { apps, minutes, avgMinutes, goals, assists, scorerPerGame, minutesPerScorer, yellow, red };
+}
+
+function resizeImageFile(file, maxSize = 200) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = maxSize;
+        canvas.height = maxSize;
+        const ctx = canvas.getContext("2d");
+        const scale = Math.max(maxSize / img.width, maxSize / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (maxSize - w) / 2, (maxSize - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 async function copyToClipboard(text) {
@@ -206,6 +241,7 @@ async function copyToClipboard(text) {
     }
   }
 }
+
 /* ---------------------------------------------------------------------- */
 /*  fussball.de Spielplan-Text parsen (Copy & Paste, keine API vorhanden)  */
 /* ---------------------------------------------------------------------- */
@@ -325,6 +361,218 @@ function Field({ label, children }) {
 const inputCls =
   "w-full bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-3 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#c8102e] focus:border-transparent";
 
+
+const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Flügel", "ST"];
+
+function PlayerCard({ player, stats, onClose }) {
+  const statItems = [
+    ["Spiele", stats.apps],
+    ["Minuten", stats.minutes],
+    ["Ø Min/Spiel", stats.avgMinutes],
+    ["Tore", stats.goals],
+    ["Vorlagen", stats.assists],
+    ["Scorer/Spiel", stats.scorerPerGame],
+    ["Min./Scorer", stats.minutesPerScorer ?? "–"],
+    ["Gelbe Karten", stats.yellow],
+    ["Rote Karten", stats.red],
+  ];
+  const lastAlone = statItems.length % 2 === 1;
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl border-4 border-[#c8102e] bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 flex flex-col items-center relative" style={{ background: "#c8102e" }}>
+          <ClubCrest size={28} />
+          {player.photo ? (
+            <img
+              src={player.photo}
+              alt={player.name}
+              className="w-20 h-20 rounded-full object-cover my-3 border-4 border-white"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center my-3 border-4 border-white">
+              <span className="text-2xl font-bold text-[#c8102e]" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                {initials(player.name)}
+              </span>
+            </div>
+          )}
+          <div className="text-white text-xl font-bold tracking-wide text-center leading-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            {player.name}
+          </div>
+          <div className="text-white/90 text-xs uppercase tracking-widest mt-0.5">
+            #{player.number || "–"} · {player.position || "–"}
+          </div>
+        </div>
+        <div className="bg-white p-4 grid grid-cols-2 gap-3">
+          {statItems.map(([label, val], i) => (
+            <div
+              key={label}
+              className={"bg-[#faf0f0] border border-[#f0d0d0] rounded-lg py-3 text-center" + (i === statItems.length - 1 && lastAlone ? " col-span-2" : "")}
+            >
+              <div className="text-xl font-bold text-[#a3172a]" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                {val}
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-stone-500 mt-0.5">{label}</div>
+            </div>
+          ))}
+        </div>
+        <p className="bg-white text-center text-stone-400 text-[10px] pb-2 -mt-1">nur Ligaspiele</p>
+        <button
+          onClick={onClose}
+          className="w-full text-center text-stone-500 hover:text-[#c8102e] text-xs py-3 bg-white border-t border-stone-200"
+        >
+          Schließen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KaderTab({ squad, setSquad, matches }) {
+  const [draft, setDraft] = useState({ name: "", number: "", position: POSITIONS[0], notes: "" });
+  const [cardPlayer, setCardPlayer] = useState(null);
+
+  const addPlayer = () => {
+    if (!draft.name.trim()) return;
+    const next = [...squad, { id: uid(), ...draft }];
+    setSquad(next);
+    setDraft({ name: "", number: "", position: POSITIONS[0], notes: "" });
+  };
+
+  const removePlayer = (id) => setSquad(squad.filter((p) => p.id !== id));
+
+  const updatePlayer = (id, field, value) =>
+    setSquad(squad.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+
+  const handlePhotoChange = async (id, file) => {
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageFile(file);
+      updatePlayer(id, "photo", dataUrl);
+    } catch (err) {
+      console.error("Foto konnte nicht verarbeitet werden:", err);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <h2 className="text-white text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        KADERLISTE
+      </h2>
+
+      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          <input
+            className={inputCls}
+            placeholder="Name"
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+          <input
+            className={inputCls}
+            placeholder="Rückennr."
+            value={draft.number}
+            onChange={(e) => setDraft({ ...draft, number: e.target.value })}
+          />
+          <select
+            className={inputCls}
+            value={draft.position}
+            onChange={(e) => setDraft({ ...draft, position: e.target.value })}
+          >
+            {POSITIONS.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+          <input
+            className={inputCls}
+            placeholder="Notiz (optional)"
+            value={draft.notes}
+            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+          />
+        </div>
+        <button
+          onClick={addPlayer}
+          className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md"
+        >
+          <Plus size={15} /> Spieler hinzufügen
+        </button>
+      </div>
+
+      {squad.length === 0 ? (
+        <p className="text-stone-500 text-sm">Noch keine Spieler eingetragen.</p>
+      ) : (
+        <div className="space-y-2">
+          {squad
+            .slice()
+            .sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99))
+            .map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-3 bg-[#122e23] border border-[#254536] rounded-lg px-3 py-2"
+              >
+                <label
+                  className="w-8 h-8 rounded-full bg-[#0f2a20] border border-[#2a4a3c] flex items-center justify-center text-xs text-stone-300 font-bold shrink-0 cursor-pointer overflow-hidden"
+                  title="Foto hochladen"
+                >
+                  {p.photo ? (
+                    <img src={p.photo} alt={p.name} className="w-full h-full object-cover" />
+                  ) : (
+                    p.number || "–"
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handlePhotoChange(p.id, e.target.files?.[0])}
+                  />
+                </label>
+                <input
+                  className="bg-transparent text-sm text-white flex-1 min-w-0 focus:outline-none"
+                  value={p.name}
+                  onChange={(e) => updatePlayer(p.id, "name", e.target.value)}
+                />
+                <select
+                  className="bg-[#0f2a20] border border-[#2a4a3c] rounded-md text-xs text-stone-300 px-2 py-1"
+                  value={p.position}
+                  onChange={(e) => updatePlayer(p.id, "position", e.target.value)}
+                >
+                  {POSITIONS.map((pos) => (
+                    <option key={pos}>{pos}</option>
+                  ))}
+                </select>
+                <input
+                  className="hidden sm:block bg-transparent text-xs text-stone-400 flex-1 min-w-0 focus:outline-none"
+                  placeholder="Notiz"
+                  value={p.notes}
+                  onChange={(e) => updatePlayer(p.id, "notes", e.target.value)}
+                />
+                <button onClick={() => setCardPlayer(p)} className="text-stone-500 hover:text-white shrink-0" title="Spielerkarte anzeigen">
+                  <CreditCard size={15} />
+                </button>
+                <button onClick={() => removePlayer(p.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {cardPlayer && (
+        <PlayerCard
+          player={cardPlayer}
+          stats={computePlayerStats(cardPlayer.id, matches)}
+          onClose={() => setCardPlayer(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------- */
 /*  Formation definitions (x/y in % of pitch, y=0 own goal, y=100 attack)  */
 /* ---------------------------------------------------------------------- */
@@ -410,10 +658,6 @@ const FORMATIONS = {
   ],
 };
 
-/* ---------------------------------------------------------------------- */
-/*  Spiel-Konstanten                                                       */
-/* ---------------------------------------------------------------------- */
-
 const emptyGame = {
   matchType: "Liga",
   formation: "4-4-2",
@@ -453,10 +697,6 @@ const MATCH_TYPES = ["Liga", "Pokal", "Testspiel"];
 const MATCH_TYPE_COLORS = { Liga: "#3fae6b", Pokal: "#c8a13f", Testspiel: "#7a93a8" };
 const CARD_TYPES = ["Gelb", "Gelb-Rot", "Rot"];
 const CARD_COLORS = { Gelb: "#e7c246", "Gelb-Rot": "#e08a2e", Rot: "#c8102e" };
-
-/* ---------------------------------------------------------------------- */
-/*  Auth gate -- Firebase email/password login for the two trainers        */
-/* ---------------------------------------------------------------------- */
 
 function AuthGate({ onAuthed }) {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
@@ -561,186 +801,6 @@ function AuthGate({ onAuthed }) {
           {mode === "signin" ? "Noch kein Konto? Hier erstellen" : "Schon ein Konto? Hier anmelden"}
         </button>
       </div>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------------- */
-/*  Tab: Kader                                                              */
-/* ---------------------------------------------------------------------- */
-
-
-const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Flügel", "ST"];
-
-function PlayerCard({ player, stats, onClose }) {
-  const statItems = [
-    ["Spiele", stats.apps],
-    ["Minuten", stats.minutes],
-    ["Ø Min/Spiel", stats.avgMinutes],
-    ["Tore", stats.goals],
-    ["Vorlagen", stats.assists],
-  ];
-  return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl border-4 border-[#122e23]"
-        style={{ background: "linear-gradient(180deg, #c8102e 0%, #8f0c20 100%)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-5 flex flex-col items-center relative">
-          <ClubCrest size={28} />
-          <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center my-3 border-4 border-[#122e23]">
-            <span className="text-2xl font-bold text-[#122e23]" style={{ fontFamily: "'Oswald', sans-serif" }}>
-              {initials(player.name)}
-            </span>
-          </div>
-          <div className="text-white text-xl font-bold tracking-wide text-center leading-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>
-            {player.name}
-          </div>
-          <div className="text-white/80 text-xs uppercase tracking-widest mt-0.5">
-            #{player.number || "–"} · {player.position || "–"}
-          </div>
-        </div>
-        <div className="bg-[#122e23] p-4 grid grid-cols-2 gap-3">
-          {statItems.map(([label, val], i) => (
-            <div
-              key={label}
-              className={"bg-[#0f2a20] border border-[#2a4a3c] rounded-lg py-3 text-center" + (i === statItems.length - 1 ? " col-span-2" : "")}
-            >
-              <div className="text-xl font-bold text-white" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                {val}
-              </div>
-              <div className="text-[10px] uppercase tracking-wide text-stone-400 mt-0.5">{label}</div>
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={onClose}
-          className="w-full text-center text-white/70 hover:text-white text-xs py-3 bg-[#122e23] border-t border-[#254536]"
-        >
-          Schließen
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function KaderTab({ squad, setSquad, matches }) {
-  const [draft, setDraft] = useState({ name: "", number: "", position: POSITIONS[0], notes: "" });
-  const [cardPlayer, setCardPlayer] = useState(null);
-
-  const addPlayer = () => {
-    if (!draft.name.trim()) return;
-    const next = [...squad, { id: uid(), ...draft }];
-    setSquad(next);
-    setDraft({ name: "", number: "", position: POSITIONS[0], notes: "" });
-  };
-
-  const removePlayer = (id) => setSquad(squad.filter((p) => p.id !== id));
-
-  const updatePlayer = (id, field, value) =>
-    setSquad(squad.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
-
-  return (
-    <div className="max-w-3xl mx-auto">
-      <h2 className="text-white text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
-        KADERLISTE
-      </h2>
-
-      <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <input
-            className={inputCls}
-            placeholder="Name"
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          />
-          <input
-            className={inputCls}
-            placeholder="Rückennr."
-            value={draft.number}
-            onChange={(e) => setDraft({ ...draft, number: e.target.value })}
-          />
-          <select
-            className={inputCls}
-            value={draft.position}
-            onChange={(e) => setDraft({ ...draft, position: e.target.value })}
-          >
-            {POSITIONS.map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-          <input
-            className={inputCls}
-            placeholder="Notiz (optional)"
-            value={draft.notes}
-            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-          />
-        </div>
-        <button
-          onClick={addPlayer}
-          className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md"
-        >
-          <Plus size={15} /> Spieler hinzufügen
-        </button>
-      </div>
-
-      {squad.length === 0 ? (
-        <p className="text-stone-500 text-sm">Noch keine Spieler eingetragen.</p>
-      ) : (
-        <div className="space-y-2">
-          {squad
-            .slice()
-            .sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99))
-            .map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-3 bg-[#122e23] border border-[#254536] rounded-lg px-3 py-2"
-              >
-                <div className="w-8 h-8 rounded-full bg-[#0f2a20] border border-[#2a4a3c] flex items-center justify-center text-xs text-stone-300 font-bold shrink-0">
-                  {p.number || "–"}
-                </div>
-                <input
-                  className="bg-transparent text-sm text-white flex-1 min-w-0 focus:outline-none"
-                  value={p.name}
-                  onChange={(e) => updatePlayer(p.id, "name", e.target.value)}
-                />
-                <select
-                  className="bg-[#0f2a20] border border-[#2a4a3c] rounded-md text-xs text-stone-300 px-2 py-1"
-                  value={p.position}
-                  onChange={(e) => updatePlayer(p.id, "position", e.target.value)}
-                >
-                  {POSITIONS.map((pos) => (
-                    <option key={pos}>{pos}</option>
-                  ))}
-                </select>
-                <input
-                  className="hidden sm:block bg-transparent text-xs text-stone-400 flex-1 min-w-0 focus:outline-none"
-                  placeholder="Notiz"
-                  value={p.notes}
-                  onChange={(e) => updatePlayer(p.id, "notes", e.target.value)}
-                />
-                <button onClick={() => setCardPlayer(p)} className="text-stone-500 hover:text-white shrink-0" title="Spielerkarte anzeigen">
-                  <CreditCard size={15} />
-                </button>
-                <button onClick={() => removePlayer(p.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
-        </div>
-      )}
-
-      {cardPlayer && (
-        <PlayerCard
-          player={cardPlayer}
-          stats={computePlayerStats(cardPlayer.id, matches)}
-          onClose={() => setCardPlayer(null)}
-        />
-      )}
     </div>
   );
 }
