@@ -39,7 +39,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import ReactDOM from "react-dom/client";
 import {
   Users, Shield, BarChart3, KeyRound, Plus, Trash2, Eye, EyeOff,
-  Lock, ChevronRight, Save, AlertCircle, LogOut, Mail
+  Lock, ChevronRight, Save, AlertCircle, LogOut, Mail, CreditCard
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -158,6 +158,31 @@ function shortName(fullName) {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length < 2) return fullName;
   return `${parts[0][0]}. ${parts[parts.length - 1]}`;
+}
+
+function initials(fullName) {
+  if (!fullName) return "?";
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return parts[0]?.[0]?.toUpperCase() || "?";
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function computePlayerStats(playerId, matches) {
+  let apps = 0, minutes = 0, goals = 0, assists = 0;
+  (matches || []).forEach((m) => {
+    (m.appearances || []).forEach((a) => {
+      if (a.id === playerId) {
+        apps += 1;
+        minutes += Number(a.minutes) || 0;
+      }
+    });
+    (m.goals || []).forEach((g) => {
+      if (g.playerId === playerId) goals += 1;
+      if (g.assistId === playerId) assists += 1;
+    });
+  });
+  const avgMinutes = apps > 0 ? Math.round(minutes / apps) : 0;
+  return { apps, minutes, avgMinutes, goals, assists };
 }
 
 async function copyToClipboard(text) {
@@ -406,6 +431,10 @@ const emptyGame = {
   reviewNotes: "",
   ourNotes: "",
   ourTactics: "",
+  opponentTablePosition: "",
+  opponentGoalDiff: "",
+  opponentTopScorers: "",
+  opponentForm: ["", "", ""],
   opponentFormation: "",
   opponentStrengths: "",
   opponentWeaknesses: "",
@@ -543,8 +572,65 @@ function AuthGate({ onAuthed }) {
 
 const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Flügel", "ST"];
 
-function KaderTab({ squad, setSquad }) {
+function PlayerCard({ player, stats, onClose }) {
+  const statItems = [
+    ["Spiele", stats.apps],
+    ["Minuten", stats.minutes],
+    ["Ø Min/Spiel", stats.avgMinutes],
+    ["Tore", stats.goals],
+    ["Vorlagen", stats.assists],
+  ];
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl border-4 border-[#122e23]"
+        style={{ background: "linear-gradient(180deg, #c8102e 0%, #8f0c20 100%)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 flex flex-col items-center relative">
+          <ClubCrest size={28} />
+          <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center my-3 border-4 border-[#122e23]">
+            <span className="text-2xl font-bold text-[#122e23]" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              {initials(player.name)}
+            </span>
+          </div>
+          <div className="text-white text-xl font-bold tracking-wide text-center leading-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            {player.name}
+          </div>
+          <div className="text-white/80 text-xs uppercase tracking-widest mt-0.5">
+            #{player.number || "–"} · {player.position || "–"}
+          </div>
+        </div>
+        <div className="bg-[#122e23] p-4 grid grid-cols-2 gap-3">
+          {statItems.map(([label, val], i) => (
+            <div
+              key={label}
+              className={"bg-[#0f2a20] border border-[#2a4a3c] rounded-lg py-3 text-center" + (i === statItems.length - 1 ? " col-span-2" : "")}
+            >
+              <div className="text-xl font-bold text-white" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                {val}
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-stone-400 mt-0.5">{label}</div>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full text-center text-white/70 hover:text-white text-xs py-3 bg-[#122e23] border-t border-[#254536]"
+        >
+          Schließen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KaderTab({ squad, setSquad, matches }) {
   const [draft, setDraft] = useState({ name: "", number: "", position: POSITIONS[0], notes: "" });
+  const [cardPlayer, setCardPlayer] = useState(null);
 
   const addPlayer = () => {
     if (!draft.name.trim()) return;
@@ -637,6 +723,9 @@ function KaderTab({ squad, setSquad }) {
                   value={p.notes}
                   onChange={(e) => updatePlayer(p.id, "notes", e.target.value)}
                 />
+                <button onClick={() => setCardPlayer(p)} className="text-stone-500 hover:text-white shrink-0" title="Spielerkarte anzeigen">
+                  <CreditCard size={15} />
+                </button>
                 <button onClick={() => removePlayer(p.id)} className="text-stone-500 hover:text-[#ff8a8a] shrink-0">
                   <Trash2 size={15} />
                 </button>
@@ -644,13 +733,17 @@ function KaderTab({ squad, setSquad }) {
             ))}
         </div>
       )}
+
+      {cardPlayer && (
+        <PlayerCard
+          player={cardPlayer}
+          stats={computePlayerStats(cardPlayer.id, matches)}
+          onClose={() => setCardPlayer(null)}
+        />
+      )}
     </div>
   );
 }
-
-/* ---------------------------------------------------------------------- */
-/*  Tab: Aktuelles Spiel                                                    */
-/* ---------------------------------------------------------------------- */
 
 function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSchedule }) {
   const [section, setSection] = useState("vorbereitung");
@@ -1288,6 +1381,57 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
             <div className="bg-[#122e23] border border-[#254536] rounded-lg p-4">
               <h3 className="text-white text-sm font-semibold mb-3">Über den Gegner</h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Tabellenplatz">
+                  <input className={inputCls} placeholder="z.B. 3." value={game.opponentTablePosition} onChange={(e) => setGame({ ...game, opponentTablePosition: e.target.value })} />
+                </Field>
+                <Field label="Torverhältnis">
+                  <input className={inputCls} placeholder="z.B. 45:20" value={game.opponentGoalDiff} onChange={(e) => setGame({ ...game, opponentGoalDiff: e.target.value })} />
+                </Field>
+              </div>
+
+              <Field label="Top-Torschützen">
+                <textarea rows={2} className={inputCls} placeholder="1. Name (Tore) / 2. Name (Tore) / 3. Name (Tore)" value={game.opponentTopScorers} onChange={(e) => setGame({ ...game, opponentTopScorers: e.target.value })} />
+              </Field>
+
+              <div className="mb-3">
+                <span className="block text-[11px] font-semibold tracking-wide uppercase text-stone-400 mb-1">
+                  Form (letzte 3 Spiele)
+                </span>
+                <div className="flex gap-1.5">
+                  {(game.opponentForm || ["", "", ""]).map((f, i) => {
+                    const cycle = { "": "S", S: "U", U: "N", N: "" };
+                    const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
+                    const labels = { S: "S", U: "U", N: "N", "": "–" };
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const next = [...(game.opponentForm || ["", "", ""])];
+                          next[i] = cycle[next[i] || ""];
+                          setGame({ ...game, opponentForm: next });
+                        }}
+                        className="w-9 h-9 rounded-full text-xs font-bold text-white flex items-center justify-center border border-[#2a4a3c]"
+                        style={{ background: colors[f || ""] }}
+                        title="Klicken zum Wechseln: Sieg / Unentschieden / Niederlage"
+                      >
+                        {labels[f || ""]}
+                      </button>
+                    );
+                  })}
+                  <span className="text-stone-500 text-[11px] self-center ml-1">antippen zum Wechseln</span>
+                </div>
+              </div>
+
+              {headToHead && (
+                <div className="mb-3 bg-[#0f2a20] border border-[#2a4a3c] rounded-md px-3 py-2 flex items-center gap-2 text-sm">
+                  <span className="text-stone-400 text-xs">Letztes Spiel gegen uns:</span>
+                  <span className="text-white font-semibold tabular-nums">{headToHead.scoreUs}:{headToHead.scoreThem}</span>
+                  <span className="text-stone-500 text-xs ml-auto">{formatDateDE(headToHead.date)}</span>
+                </div>
+              )}
+
               <Field label="Vermutetes System">
                 <input className={inputCls} value={game.opponentFormation} onChange={(e) => setGame({ ...game, opponentFormation: e.target.value })} />
               </Field>
@@ -1926,7 +2070,7 @@ export default function App() {
       </nav>
 
       <main className="px-4 sm:px-6 py-6">
-        {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} />}
+        {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} matches={matches} />}
         {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} />}
         {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} />}
         {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
