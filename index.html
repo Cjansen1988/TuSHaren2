@@ -1085,7 +1085,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               }}
             >
               <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
-              <div className="absolute left-1/2 top-3 bottom-3 w-px bg-white/25 -translate-x-1/2 pointer-events-none" />
+              <div className="absolute top-1/2 left-3 right-3 h-px bg-white/25 -translate-y-1/2 pointer-events-none" />
               <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
               <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
               <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
@@ -1098,7 +1098,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 <div
                   onPointerDown={() => setDraggingLine(true)}
                   onTouchStart={() => setDraggingLine(true)}
-                  className="absolute -left-1 -translate-y-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-ns-resize select-none shadow"
+                  className="absolute left-2 -translate-y-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-ns-resize select-none shadow"
                   style={{ background: "#ffd54a", color: "#122e23", touchAction: "none" }}
                   title="Ziehen, um die Pressinglinie zu verschieben"
                 >
