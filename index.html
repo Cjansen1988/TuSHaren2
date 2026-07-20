@@ -984,7 +984,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   /* ---- match report helpers ---- */
   const setReport = (patch) => setGame({ ...game, report: { ...report, ...patch } });
 
-  const [goalDraft, setGoalDraft] = useState({ playerId: "", assistId: "", minute: "" });
+  const [goalDraft, setGoalDraft] = useState({ playerId: "", assistId: "", minute: "", scoreUsAfter: "", scoreThemAfter: "" });
   const [cardDraft, setCardDraft] = useState({ playerId: "", type: CARD_TYPES[0], minute: "" });
   const [subDraft, setSubDraft] = useState({ outId: "", inId: "", minute: "" });
 
@@ -997,9 +997,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
         id: uid(), minute: goalDraft.minute,
         playerId: goalDraft.playerId, playerName: p?.name || "?",
         assistId: goalDraft.assistId || null, assistName: a?.name || "",
+        scoreUsAfter: goalDraft.scoreUsAfter, scoreThemAfter: goalDraft.scoreThemAfter,
       }],
     });
-    setGoalDraft({ playerId: "", assistId: "", minute: "" });
+    setGoalDraft({ playerId: "", assistId: "", minute: "", scoreUsAfter: "", scoreThemAfter: "" });
   };
   const removeGoal = (id) => setReport({ goals: report.goals.filter((g) => g.id !== id) });
 
@@ -1134,11 +1135,59 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
     return lines.join("\n");
   }, [game, matchSquad, lineup, squad]);
 
-  const handleCopy = async () => {
-    const ok = await copyToClipboard(teamMessage);
+  const resultMessage = useMemo(() => {
+    const startersLines = Object.values(lineup)
+      .filter((e) => e?.playerId)
+      .map((e) => {
+        const p = getPlayer(e.playerId);
+        if (!p) return null;
+        return `${e.number || p.number || "–"} ${e.position || ""} – ${p.name}`.replace(/\s+/g, " ").trim();
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    const goalsLines = report.goals
+      .map((g) => {
+        const scoreNote = g.scoreUsAfter !== "" && g.scoreThemAfter !== "" && g.scoreUsAfter != null && g.scoreThemAfter != null
+          ? ` – Tor zum ${g.scoreUsAfter}:${g.scoreThemAfter}`
+          : "";
+        return `${g.minute ? `${g.minute}' ` : ""}${g.playerName}${g.assistName ? ` (Vorlage: ${g.assistName})` : ""}${scoreNote}`;
+      })
+      .join("\n");
+
+    const subsLines = report.subs
+      .map((s) => `${s.minute ? `${s.minute}' ` : ""}${s.outName} raus, ${s.inName} rein`)
+      .join("\n");
+
+    const cardsLines = report.cards
+      .map((c) => `${c.minute ? `${c.minute}' ` : ""}${c.playerName} – ${c.type}`)
+      .join("\n");
+
+    const lines = [
+      `⚽ TuS Haren 2 – Ergebnisdienst`,
+      ``,
+      `🗓️ Datum: ${formatDateDE(game.date) || "–"}`,
+      `🆚 Gegner: ${game.opponentName || "–"}`,
+      `🏆 Spielart: ${game.matchType}`,
+      `📊 Endstand: ${report.scoreUs || "0"} : ${report.scoreThem || "0"}`,
+    ];
+
+    if (goalsLines) lines.push(``, `⚽ Torschützen:`, goalsLines);
+    if (subsLines) lines.push(``, `🔄 Wechsel:`, subsLines);
+    if (cardsLines) lines.push(``, `🟨🟥 Karten:`, cardsLines);
+    if (startersLines) lines.push(``, `Aufstellung:`, startersLines);
+
+    return lines.join("\n");
+  }, [game, report, lineup, squad]);
+
+  const handleCopyText = async (text) => {
+    const ok = await copyToClipboard(text);
     setCopyState(ok ? "copied" : "failed");
     setTimeout(() => setCopyState("idle"), 2500);
   };
+
+  const handleCopy = () => handleCopyText(teamMessage);
+  const handleCopyResult = () => handleCopyText(resultMessage);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -1157,6 +1206,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
           ["vorbereitung", "Vorbereitung"],
           ["nachricht", "Team-Nachricht"],
           ["spielbericht", "Spielbericht"],
+          ["ergebnisdienst", "Ergebnisdienst"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -1652,6 +1702,12 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               </select>
               <input className={inputCls + " text-xs"} placeholder="Min." value={goalDraft.minute} onChange={(e) => setGoalDraft({ ...goalDraft, minute: e.target.value.replace(/\D/, "") })} />
             </div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[var(--text-tertiary)] text-xs">Stand nach diesem Tor:</span>
+              <input className={inputCls + " text-xs w-14 text-center"} placeholder="Wir" value={goalDraft.scoreUsAfter} onChange={(e) => setGoalDraft({ ...goalDraft, scoreUsAfter: e.target.value.replace(/\D/, "") })} />
+              <span className="text-[var(--text-tertiary)] text-xs">:</span>
+              <input className={inputCls + " text-xs w-14 text-center"} placeholder="Gegner" value={goalDraft.scoreThemAfter} onChange={(e) => setGoalDraft({ ...goalDraft, scoreThemAfter: e.target.value.replace(/\D/, "") })} />
+            </div>
             <button onClick={addGoal} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-xs font-semibold px-3 py-1.5 rounded-md mb-3">
               <Plus size={13} /> Tor eintragen
             </button>
@@ -1659,7 +1715,12 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               {report.goals.map((g) => (
                 <div key={g.id} className="flex items-center gap-2 text-sm text-[var(--text-body)] bg-[var(--bg-input)] rounded-md px-2 py-1.5">
                   <span className="text-xs text-[var(--text-secondary)] w-8">{g.minute ? `${g.minute}'` : "–"}</span>
-                  <span className="flex-1">⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}</span>
+                  <span className="flex-1">
+                    ⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}
+                    {g.scoreUsAfter !== "" && g.scoreThemAfter !== "" && g.scoreUsAfter != null && g.scoreThemAfter != null
+                      ? ` – Tor zum ${g.scoreUsAfter}:${g.scoreThemAfter}`
+                      : ""}
+                  </span>
                   <button onClick={() => removeGoal(g.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a]"><Trash2 size={13} /></button>
                 </div>
               ))}
@@ -1742,6 +1803,33 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               <Save size={15} /> Spielbericht abschließen &amp; in Statistik übernehmen
             </button>
           </div>
+        </div>
+      )}
+
+      {section === "ergebnisdienst" && (
+        <div className="max-w-xl">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-4">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Vorschau</h3>
+            <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+              Wird aus Endstand, Torschützen, Wechseln und Karten im Spielbericht sowie der Aufstellung erzeugt.
+              Einfach kopieren und in eure WhatsApp-Gruppe einfügen.
+            </p>
+            <pre className="whitespace-pre-wrap break-words bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md p-3 text-sm text-[var(--text-body)] leading-relaxed">
+              {resultMessage}
+            </pre>
+          </div>
+          <button
+            onClick={handleCopyResult}
+            className="w-full flex items-center justify-center gap-2 bg-[#c8102e] hover:bg-[#a80d26] text-white font-semibold py-2.5 rounded-md text-sm"
+          >
+            <Save size={15} />
+            {copyState === "copied" ? "Kopiert!" : copyState === "failed" ? "Kopieren fehlgeschlagen – bitte manuell markieren" : "Nachricht kopieren"}
+          </button>
+          {report.goals.length === 0 && report.subs.length === 0 && Object.keys(lineup).length === 0 && (
+            <p className="text-[var(--text-tertiary)] text-xs mt-3">
+              Tipp: Trage unter „Spielbericht" Endstand, Torschützen und Wechsel ein, damit hier mehr als der nackte Spielstand erscheint.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -1981,7 +2069,12 @@ function StatsTab({ matches, setMatches }) {
                       <div>
                         <p className="text-[var(--text-tertiary)] uppercase tracking-wide text-[10px] mb-1">Tore</p>
                         {m.goals.map((g) => (
-                          <p key={g.id}>{g.minute ? `${g.minute}' ` : ""}⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}</p>
+                          <p key={g.id}>
+                            {g.minute ? `${g.minute}' ` : ""}⚽ {g.playerName}{g.assistName ? ` (Vorlage: ${g.assistName})` : ""}
+                            {g.scoreUsAfter !== "" && g.scoreThemAfter !== "" && g.scoreUsAfter != null && g.scoreThemAfter != null
+                              ? ` – Tor zum ${g.scoreUsAfter}:${g.scoreThemAfter}`
+                              : ""}
+                          </p>
                         ))}
                       </div>
                     )}
@@ -2242,7 +2335,7 @@ function PresentationView({ squad, game, onExit }) {
             <div className="space-y-2">
               {bench.map((p) => (
                 <div key={p.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2 flex items-center gap-2">
-                  <span className="text-[var(--text-tertiary)] text-sm w-6">{p.number || "–"}</span>
+                  <span className="text-[var(--text-tertiary)] text-sm w-6">{game.benchNumbers?.[p.id] ?? p.number ?? "–"}</span>
                   <span className="text-[var(--text-primary)] text-base">{p.name}</span>
                 </div>
               ))}
