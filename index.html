@@ -697,6 +697,7 @@ const emptyGame = {
   lineup: {},
   benchNumbers: {},
   pressingLine: 50,
+  directArrivalIds: [],
   date: "",
   kickoff: "",
   meetingTime: "",
@@ -913,6 +914,12 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
     setGame({ ...game, matchSquad: next, lineup: nextLineup });
   };
 
+  const toggleDirectArrival = (id) => {
+    const current = game.directArrivalIds || [];
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    setGame({ ...game, directArrivalIds: next });
+  };
+
   const setSlotPlayer = (slotId, playerId) => {
     const next = { ...lineup };
     if (playerId === "") {
@@ -1112,6 +1119,18 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
       `Kader (Trikotnummer – Name):`,
       kaderLines || "–",
     ];
+
+    if (game.homeAway === "Auswärts" && (game.directArrivalIds || []).length > 0) {
+      const directNames = game.directArrivalIds
+        .map((id) => getPlayer(id))
+        .filter(Boolean)
+        .map((p) => p.name)
+        .join(", ");
+      if (directNames) {
+        lines.push(``, `🚗 Fährt direkt zum Spielort: ${directNames}`);
+      }
+    }
+
     return lines.join("\n");
   }, [game, matchSquad, lineup, squad]);
 
@@ -1457,6 +1476,32 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 </div>
               )}
             </div>
+
+            {game.homeAway === "Auswärts" && matchSquad.length > 0 && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+                <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Anreise</h3>
+                <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+                  Wer kommt nicht zum Treffpunkt, sondern fährt direkt zum Spielort? Erscheint automatisch am Ende der Team-Nachricht.
+                </p>
+                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                  {squad
+                    .filter((p) => matchSquad.includes(p.id))
+                    .sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99))
+                    .map((p) => (
+                      <label key={p.id} className="flex items-center gap-2 text-sm text-[var(--text-body)] py-0.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(game.directArrivalIds || []).includes(p.id)}
+                          onChange={() => toggleDirectArrival(p.id)}
+                          className="accent-[#c8102e]"
+                        />
+                        <span className="w-7 text-xs text-[var(--text-secondary)]">{p.number || "–"}</span>
+                        <span className="flex-1 truncate">{p.name}</span>
+                      </label>
+                    ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
               <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Über uns</h3>
