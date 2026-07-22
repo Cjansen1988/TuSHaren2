@@ -39,7 +39,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import ReactDOM from "react-dom/client";
 import {
   Users, Shield, BarChart3, KeyRound, Plus, Trash2, Eye, EyeOff,
-  Lock, ChevronRight, Save, AlertCircle, LogOut, Mail, CreditCard,
+  Lock, ChevronRight, ChevronLeft, Save, AlertCircle, LogOut, Mail, CreditCard,
   Sun, Moon, Monitor, X
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
@@ -198,12 +198,14 @@ function computePlayerStats(playerId, matches) {
   (matches || [])
     .filter((m) => (m.matchType || "Liga") === "Liga")
     .forEach((m) => {
-      (m.appearances || []).forEach((a) => {
-        if (a.id === playerId) {
-          apps += 1;
-          minutes += Number(a.minutes) || 0;
-        }
-      });
+      const appearance = (m.appearances || []).find((a) => a.id === playerId);
+      const inGoals = (m.goals || []).some((g) => g.playerId === playerId || g.assistId === playerId);
+      const inCards = (m.cards || []).some((c) => c.playerId === playerId);
+      const inSubs = (m.subs || []).some((s) => s.inId === playerId || s.outId === playerId);
+      if (appearance || inGoals || inCards || inSubs) {
+        apps += 1;
+        minutes += Number(appearance?.minutes) || 0;
+      }
       (m.goals || []).forEach((g) => {
         if (g.playerId === playerId) goals += 1;
         if (g.assistId === playerId) assists += 1;
@@ -241,6 +243,33 @@ function resizeImageFile(file, maxSize = 200) {
         const h = img.height * scale;
         ctx.drawImage(img, (maxSize - w) / 2, (maxSize - h) / 2, w, h);
         resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeImageFileFit(file, maxDim = 1100) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.72));
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -698,6 +727,7 @@ const emptyGame = {
   benchNumbers: {},
   pressingLine: 50,
   directArrivalIds: [],
+  focusImages: [],
   date: "",
   kickoff: "",
   meetingTime: "",
@@ -838,10 +868,11 @@ function AuthGate({ onAuthed }) {
   );
 }
 
-function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSchedule }) {
+function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSchedule, gameHistory, setGameHistory }) {
   const [section, setSection] = useState("vorbereitung");
   const [pasteText, setPasteText] = useState("");
   const [importInfo, setImportInfo] = useState("");
+  const [viewingHistory, setViewingHistory] = useState(null);
   const slots = FORMATIONS[game.formation] || FORMATIONS["4-4-2"];
   const matchSquad = game.matchSquad || [];
   const lineup = game.lineup || {};
@@ -920,6 +951,26 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
     setGame({ ...game, directArrivalIds: next });
   };
 
+  const handleAddFocusImage = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageFileFit(file);
+      setGame({ ...game, focusImages: [...(game.focusImages || []), { id: uid(), dataUrl, caption: "" }] });
+    } catch (err) {
+      console.error("Bild konnte nicht verarbeitet werden:", err);
+    }
+  };
+
+  const removeFocusImage = (id) => {
+    setGame({ ...game, focusImages: (game.focusImages || []).filter((i) => i.id !== id) });
+  };
+
+  const updateFocusImageCaption = (id, caption) => {
+    setGame({ ...game, focusImages: (game.focusImages || []).map((i) => (i.id === id ? { ...i, caption } : i)) });
+  };
+
   const setSlotPlayer = (slotId, playerId) => {
     const next = { ...lineup };
     if (playerId === "") {
@@ -947,7 +998,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   };
 
   const resetGame = () => {
-    if (window.confirm("Neue Spielvorbereitung starten? Aktuelle Angaben zu Spiel und Spielbericht gehen verloren (Statistik bleibt erhalten).")) {
+    if (window.confirm("Neue Spielvorbereitung starten? Die aktuelle Vorbereitung wird in den Verlauf verschoben und bleibt dort abrufbar.")) {
+      if (game.opponentName?.trim() || game.date) {
+        setGameHistory([...(gameHistory || []), { ...game, id: uid(), archivedAt: Date.now() }]);
+      }
       setGame({ ...emptyGame });
     }
   };
@@ -1062,8 +1116,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
       .map(([id, { start, end }]) => {
         const p = getPlayer(id);
         return { id, name: p?.name || "?", minutes: Math.max(0, end - start) };
-      })
-      .filter((a) => a.minutes > 0);
+      });
 
     const record = {
       id: uid(),
@@ -1189,6 +1242,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   const handleCopy = () => handleCopyText(teamMessage);
   const handleCopyResult = () => handleCopyText(resultMessage);
 
+  if (viewingHistory) {
+    return <PresentationView squad={squad} game={viewingHistory} onExit={() => setViewingHistory(null)} />;
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -1207,6 +1264,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
           ["nachricht", "Team-Nachricht"],
           ["spielbericht", "Spielbericht"],
           ["ergebnisdienst", "Ergebnisdienst"],
+          ["verlauf", "Verlauf"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -1567,6 +1625,39 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Fokus-Bilder für die Präsentation</h3>
+              <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+                Eigene Bilder/Grafiken (z.B. Taktiktafeln), auf die ihr am Spieltag hinweisen wollt. Erscheinen als eigene Folien in der Präsentation.
+              </p>
+              <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[#c8102e] hover:bg-[#a80d26] px-3 py-1.5 rounded-md cursor-pointer">
+                <Plus size={13} /> Bild hinzufügen
+                <input type="file" accept="image/*" className="hidden" onChange={handleAddFocusImage} />
+              </label>
+              {(game.focusImages || []).length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                  {game.focusImages.map((img) => (
+                    <div key={img.id} className="relative">
+                      <img src={img.dataUrl} alt="" className="w-full h-24 object-cover rounded-md border border-[var(--border-input)]" />
+                      <button
+                        onClick={() => removeFocusImage(img.id)}
+                        className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-1"
+                        title="Bild entfernen"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                      <input
+                        className="mt-1.5 w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded px-1.5 py-1 text-[10px] text-[var(--text-body)]"
+                        placeholder="Bildunterschrift (optional)"
+                        value={img.caption}
+                        onChange={(e) => updateFocusImageCaption(img.id, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
               <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Über den Gegner</h3>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1832,6 +1923,53 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
           )}
         </div>
       )}
+
+      {section === "verlauf" && (
+        <div className="max-w-2xl">
+          <p className="text-[var(--text-tertiary)] text-xs mb-4">
+            Frühere Spielvorbereitungen werden hier automatisch archiviert, sobald ihr über „Neue Spielvorbereitung starten"
+            zum nächsten Spiel wechselt. „Anzeigen" öffnet die damalige Vorbereitung als Präsentation.
+          </p>
+          {(gameHistory || []).length === 0 ? (
+            <p className="text-[var(--text-tertiary)] text-sm">Noch keine archivierten Vorbereitungen.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {(gameHistory || [])
+                .slice()
+                .sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0))
+                .map((g) => (
+                  <div key={g.id} className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2">
+                    <div className="w-24 text-xs text-[var(--text-secondary)] shrink-0">{formatDateDE(g.date) || "–"}</div>
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                      style={{ background: (MATCH_TYPE_COLORS[g.matchType] || "#7a93a8") + "33", color: MATCH_TYPE_COLORS[g.matchType] || "#7a93a8" }}
+                    >
+                      {g.matchType}
+                    </span>
+                    <div className="flex-1 text-sm text-[var(--text-primary)] truncate">{g.opponentName || "Ohne Gegner"}</div>
+                    {g.report?.scoreUs !== "" && g.report?.scoreThem !== "" && g.report?.scoreUs != null && g.report?.scoreThem != null && (
+                      <div className="text-sm font-bold text-[var(--text-primary)] tabular-nums shrink-0">
+                        {g.report.scoreUs}:{g.report.scoreThem}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setViewingHistory(g)}
+                      className="text-xs font-semibold text-white bg-[#254536] hover:bg-[#2f5643] px-3 py-1.5 rounded-md shrink-0"
+                    >
+                      Anzeigen
+                    </button>
+                    <button
+                      onClick={() => setGameHistory((gameHistory || []).filter((x) => x.id !== g.id))}
+                      className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1869,18 +2007,30 @@ function StatsTab({ matches, setMatches }) {
       return stats[key];
     };
     filtered.forEach((m) => {
+      const involved = new Set();
       (m.appearances || []).forEach((a) => {
         const key = a.id || a.name;
         const s = ensure(key, a.name);
         s.apps += 1;
         s.minutes += Number(a.minutes) || 0;
+        involved.add(key);
       });
       (m.goals || []).forEach((g) => {
         const key = g.playerId || g.playerName;
-        ensure(key, g.playerName).goals += 1;
+        const s = ensure(key, g.playerName);
+        s.goals += 1;
+        if (!involved.has(key)) {
+          s.apps += 1;
+          involved.add(key);
+        }
         if (g.assistId || g.assistName) {
           const akey = g.assistId || g.assistName;
-          ensure(akey, g.assistName).assists += 1;
+          const as = ensure(akey, g.assistName);
+          as.assists += 1;
+          if (!involved.has(akey)) {
+            as.apps += 1;
+            involved.add(akey);
+          }
         }
       });
       (m.cards || []).forEach((c) => {
@@ -1889,6 +2039,22 @@ function StatsTab({ matches, setMatches }) {
         if (c.type === "Gelb") s.yellow += 1;
         else if (c.type === "Gelb-Rot") s.yellowRed += 1;
         else if (c.type === "Rot") s.red += 1;
+        if (!involved.has(key)) {
+          s.apps += 1;
+          involved.add(key);
+        }
+      });
+      (m.subs || []).forEach((sub) => {
+        [
+          [sub.inId, sub.inName],
+          [sub.outId, sub.outName],
+        ].forEach(([pid, pname]) => {
+          if (pid && !involved.has(pid)) {
+            const s = ensure(pid, pname);
+            s.apps += 1;
+            involved.add(pid);
+          }
+        });
       });
     });
     return Object.values(stats).sort((a, b) => b.goals - a.goals || b.apps - a.apps);
@@ -2223,6 +2389,10 @@ const TABS = [
 /* ---------------------------------------------------------------------- */
 
 function PresentationView({ squad, game, onExit }) {
+  const [slide, setSlide] = useState(0);
+  const focusImages = game.focusImages || [];
+  const SLIDES = ["Gegner", "Spielidee & Infos", ...focusImages.map((_, i) => `Fokus ${i + 1}`), "Aufstellung"];
+
   useEffect(() => {
     const el = document.documentElement;
     if (el.requestFullscreen) {
@@ -2230,6 +2400,8 @@ function PresentationView({ squad, game, onExit }) {
     }
     const onKey = (e) => {
       if (e.key === "Escape") onExit();
+      else if (e.key === "ArrowRight") setSlide((s) => Math.min(SLIDES.length - 1, s + 1));
+      else if (e.key === "ArrowLeft") setSlide((s) => Math.max(0, s - 1));
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -2247,6 +2419,10 @@ function PresentationView({ squad, game, onExit }) {
   const assignedIds = Object.values(lineup).map((v) => v?.playerId).filter(Boolean);
   const getPlayer = (id) => squad.find((p) => p.id === id);
   const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
+  const directArrival = (game.directArrivalIds || []).map((id) => getPlayer(id)).filter(Boolean);
+
+  const goPrev = () => setSlide((s) => Math.max(0, s - 1));
+  const goNext = () => setSlide((s) => Math.min(SLIDES.length - 1, s + 1));
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative">
@@ -2257,8 +2433,8 @@ function PresentationView({ squad, game, onExit }) {
         <X size={16} /> Beenden (Esc)
       </button>
 
-      <div className="flex items-center gap-5 mb-8">
-        <ClubCrest size={72} />
+      <div className="flex items-center gap-5 mb-6">
+        <ClubCrest size={64} />
         <div>
           <h1 className="text-[var(--text-primary)] text-3xl font-bold tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
             TUS HAREN 2 {game.opponentName ? `vs. ${game.opponentName}` : ""}
@@ -2273,174 +2449,265 @@ function PresentationView({ squad, game, onExit }) {
               {game.matchType}
             </span>
             <span>{game.homeAway === "Heim" ? "Heimspiel" : "Auswärtsspiel"}</span>
-            {game.meetingTime && <span>Treffpunkt: {game.meetingTime}</span>}
-            {game.jerseyColor && <span>Trikot: {game.jerseyColor}</span>}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <div
-            className="relative w-full max-w-xl mx-auto rounded-xl border-2 border-[#e8e6df]/30 overflow-hidden"
-            style={{
-              aspectRatio: "0.68",
-              background: "repeating-linear-gradient(to bottom, #1c5238 0, #1c5238 11.11%, #1a4a32 11.11%, #1a4a32 22.22%)",
-            }}
-          >
-            <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
-            <div className="absolute top-1/2 left-3 right-3 h-px bg-white/25 -translate-y-1/2 pointer-events-none" />
-            <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-            <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
-            <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
-
-            <div
-              className="absolute left-0 right-0 border-t-2 border-dashed pointer-events-none"
-              style={{ top: `${game.pressingLine ?? 50}%`, borderColor: "#ffd54a" }}
-            >
-              <div
-                className="absolute left-2 -translate-y-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: "#ffd54a", color: "#122e23" }}
-              >
-                Pressing
+      <div className="flex-1 flex flex-col justify-center">
+        {slide === 0 && (
+          <div className="max-w-3xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
+            <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              Über {game.opponentName || "den Gegner"}
+            </h2>
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              {game.opponentTablePosition && (
+                <div>
+                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Tabellenplatz</div>
+                  <div className="text-[var(--text-primary)] text-2xl font-semibold">{game.opponentTablePosition}</div>
+                </div>
+              )}
+              {game.opponentGoalDiff && (
+                <div>
+                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Torverhältnis</div>
+                  <div className="text-[var(--text-primary)] text-2xl font-semibold">{game.opponentGoalDiff}</div>
+                </div>
+              )}
+            </div>
+            {game.opponentForm && game.opponentForm.some(Boolean) && (
+              <div className="mb-6">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide mb-2">Form (letzte 3 Spiele)</div>
+                <div className="flex gap-2">
+                  {game.opponentForm.map((f, i) => {
+                    const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
+                    const labels = { S: "S", U: "U", N: "N", "": "–" };
+                    return (
+                      <div
+                        key={i}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-base font-bold"
+                        style={{ background: colors[f || ""] }}
+                      >
+                        {labels[f || ""]}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+            )}
+            {game.opponentFormation && (
+              <div className="mb-4">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Vermutetes System</div>
+                <div className="text-[var(--text-body)] text-lg">{game.opponentFormation}</div>
+              </div>
+            )}
+            {game.opponentKeyPlayers && (
+              <div className="mb-4">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Schlüsselspieler</div>
+                <div className="text-[var(--text-body)] text-lg">{game.opponentKeyPlayers}</div>
+              </div>
+            )}
+            {game.opponentTopScorers && (
+              <div className="mb-4">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Top-Torschützen</div>
+                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.opponentTopScorers}</div>
+              </div>
+            )}
+            {game.opponentStrengths && (
+              <div className="mb-4">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Stärken</div>
+                <div className="text-[var(--text-body)] text-lg">{game.opponentStrengths}</div>
+              </div>
+            )}
+            {game.opponentWeaknesses && (
+              <div>
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Schwächen</div>
+                <div className="text-[var(--text-body)] text-lg">{game.opponentWeaknesses}</div>
+              </div>
+            )}
+            {!game.opponentTablePosition && !game.opponentGoalDiff && !game.opponentFormation && !game.opponentKeyPlayers &&
+              !game.opponentTopScorers && !game.opponentStrengths && !game.opponentWeaknesses && (!game.opponentForm || !game.opponentForm.some(Boolean)) && (
+              <p className="text-[var(--text-tertiary)] text-base">Noch keine Angaben unter „Über den Gegner" eingetragen.</p>
+            )}
+          </div>
+        )}
+
+        {slide === 1 && (
+          <div className="max-w-4xl mx-auto w-full grid md:grid-cols-2 gap-8">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
+              <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                Unsere Spielidee
+              </h2>
+              {game.ourTactics && (
+                <div className="mb-4">
+                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Taktische Idee</div>
+                  <div className="text-[var(--text-body)] text-lg">{game.ourTactics}</div>
+                </div>
+              )}
+              {game.ourNotes && (
+                <div className="mb-4">
+                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ausfälle / Sonstiges</div>
+                  <div className="text-[var(--text-body)] text-lg">{game.ourNotes}</div>
+                </div>
+              )}
+              {game.reviewNotes && (
+                <div>
+                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Rückblick</div>
+                  <div className="text-[var(--text-body)] text-lg">{game.reviewNotes}</div>
+                </div>
+              )}
+              {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
+                <p className="text-[var(--text-tertiary)] text-base">Noch keine Angaben unter „Über uns" eingetragen.</p>
+              )}
             </div>
 
-            {slots.map((slot) => {
-              const entry = lineup[slot.id];
-              const p = entry ? getPlayer(entry.playerId) : null;
-              return (
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
+              <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                Spieltag-Infos
+              </h2>
+              <div className="space-y-4">
+                {game.location && (
+                  <div>
+                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ort / Anfahrt</div>
+                    <div className="text-[var(--text-body)] text-lg">{game.location}</div>
+                  </div>
+                )}
+                {game.meetingTime && (
+                  <div>
+                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Treffpunkt</div>
+                    <div className="text-[var(--text-body)] text-lg">{game.meetingTime}</div>
+                  </div>
+                )}
+                {game.jerseyColor && (
+                  <div>
+                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Trikotfarbe</div>
+                    <div className="text-[var(--text-body)] text-lg">{game.jerseyColor}</div>
+                  </div>
+                )}
+                {directArrival.length > 0 && (
+                  <div>
+                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Fährt direkt zum Spielort</div>
+                    <div className="text-[var(--text-body)] text-lg">{directArrival.map((p) => p.name).join(", ")}</div>
+                  </div>
+                )}
+                {!game.location && !game.meetingTime && !game.jerseyColor && directArrival.length === 0 && (
+                  <p className="text-[var(--text-tertiary)] text-base">Noch keine weiteren Angaben eingetragen.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {focusImages.map((img, i) => (
+          slide === 2 + i && (
+            <div key={img.id} className="max-w-4xl mx-auto w-full flex flex-col items-center">
+              <img
+                src={img.dataUrl}
+                alt={img.caption || `Fokus ${i + 1}`}
+                className="max-h-[62vh] w-auto rounded-xl border border-[var(--border-card)] object-contain"
+              />
+              {img.caption && (
+                <p className="text-[var(--text-primary)] text-xl mt-6 text-center max-w-2xl">{img.caption}</p>
+              )}
+            </div>
+          )
+        ))}
+
+        {slide === SLIDES.length - 1 && (
+          <div className="grid lg:grid-cols-3 gap-8 w-full">
+            <div className="lg:col-span-2">
+              <div
+                className="relative w-full max-w-xl mx-auto rounded-xl border-2 border-[#e8e6df]/30 overflow-hidden"
+                style={{
+                  aspectRatio: "0.68",
+                  background: "repeating-linear-gradient(to bottom, #1c5238 0, #1c5238 11.11%, #1a4a32 11.11%, #1a4a32 22.22%)",
+                }}
+              >
+                <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
+                <div className="absolute top-1/2 left-3 right-3 h-px bg-white/25 -translate-y-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
+
                 <div
-                  key={slot.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
-                  style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                  className="absolute left-0 right-0 border-t-2 border-dashed pointer-events-none"
+                  style={{ top: `${game.pressingLine ?? 50}%`, borderColor: "#ffd54a" }}
                 >
-                  <div className="bg-white/95 border-2 border-[#c8102e] rounded-full px-2.5 py-1 shadow text-center min-w-[80px]">
-                    <div className="text-[#122e23] font-bold text-sm leading-tight">{p ? p.name : slot.label}</div>
-                    {p && <div className="text-[#c8102e] text-[10px] font-semibold">#{entry.number || p.number || "–"}</div>}
+                  <div
+                    className="absolute left-2 -translate-y-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: "#ffd54a", color: "#122e23" }}
+                  >
+                    Pressing
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        <div>
-          <h2 className="text-[var(--text-primary)] text-lg font-semibold mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
-            Bank
-          </h2>
-          {bench.length === 0 ? (
-            <p className="text-[var(--text-tertiary)] text-sm">Keine Bankspieler eingetragen.</p>
-          ) : (
-            <div className="space-y-2">
-              {bench.map((p) => (
-                <div key={p.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2 flex items-center gap-2">
-                  <span className="text-[var(--text-tertiary)] text-sm w-6">{game.benchNumbers?.[p.id] ?? p.number ?? "–"}</span>
-                  <span className="text-[var(--text-primary)] text-base">{p.name}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-8 mt-8">
-        <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-6">
-          <h2 className="text-[var(--text-primary)] text-xl font-semibold mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
-            Über {game.opponentName || "den Gegner"}
-          </h2>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            {game.opponentTablePosition && (
-              <div>
-                <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Tabellenplatz</div>
-                <div className="text-[var(--text-primary)] text-lg font-semibold">{game.opponentTablePosition}</div>
-              </div>
-            )}
-            {game.opponentGoalDiff && (
-              <div>
-                <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Torverhältnis</div>
-                <div className="text-[var(--text-primary)] text-lg font-semibold">{game.opponentGoalDiff}</div>
-              </div>
-            )}
-          </div>
-          {game.opponentForm && game.opponentForm.some(Boolean) && (
-            <div className="mb-4">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide mb-1.5">Form (letzte 3 Spiele)</div>
-              <div className="flex gap-2">
-                {game.opponentForm.map((f, i) => {
-                  const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
-                  const labels = { S: "S", U: "U", N: "N", "": "–" };
+                {slots.map((slot) => {
+                  const entry = lineup[slot.id];
+                  const p = entry ? getPlayer(entry.playerId) : null;
                   return (
                     <div
-                      key={i}
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
-                      style={{ background: colors[f || ""] }}
+                      key={slot.id}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                      style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                     >
-                      {labels[f || ""]}
+                      <div className="bg-white/95 border-2 border-[#c8102e] rounded-full px-2.5 py-1 shadow text-center min-w-[80px]">
+                        <div className="text-[#122e23] font-bold text-sm leading-tight">{p ? p.name : slot.label}</div>
+                        {p && <div className="text-[#c8102e] text-[10px] font-semibold">#{entry.number || p.number || "–"}</div>}
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-          )}
-          {game.opponentFormation && (
-            <div className="mb-3">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Vermutetes System</div>
-              <div className="text-[var(--text-body)] text-base">{game.opponentFormation}</div>
-            </div>
-          )}
-          {game.opponentKeyPlayers && (
-            <div className="mb-3">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Schlüsselspieler</div>
-              <div className="text-[var(--text-body)] text-base">{game.opponentKeyPlayers}</div>
-            </div>
-          )}
-          {game.opponentTopScorers && (
-            <div className="mb-3">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Top-Torschützen</div>
-              <div className="text-[var(--text-body)] text-base whitespace-pre-line">{game.opponentTopScorers}</div>
-            </div>
-          )}
-          {game.opponentStrengths && (
-            <div className="mb-3">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Stärken</div>
-              <div className="text-[var(--text-body)] text-base">{game.opponentStrengths}</div>
-            </div>
-          )}
-          {game.opponentWeaknesses && (
-            <div>
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Schwächen</div>
-              <div className="text-[var(--text-body)] text-base">{game.opponentWeaknesses}</div>
-            </div>
-          )}
-        </div>
 
-        <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-6">
-          <h2 className="text-[var(--text-primary)] text-xl font-semibold mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
-            Unsere Taktik
-          </h2>
-          {game.ourTactics && (
-            <div className="mb-3">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Taktische Idee</div>
-              <div className="text-[var(--text-body)] text-base">{game.ourTactics}</div>
-            </div>
-          )}
-          {game.ourNotes && (
-            <div className="mb-3">
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Ausfälle / Sonstiges</div>
-              <div className="text-[var(--text-body)] text-base">{game.ourNotes}</div>
-            </div>
-          )}
-          {game.reviewNotes && (
             <div>
-              <div className="text-[var(--text-tertiary)] text-xs uppercase tracking-wide">Rückblick</div>
-              <div className="text-[var(--text-body)] text-base">{game.reviewNotes}</div>
+              <h2 className="text-[var(--text-primary)] text-lg font-semibold mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                Bank
+              </h2>
+              {bench.length === 0 ? (
+                <p className="text-[var(--text-tertiary)] text-sm">Keine Bankspieler eingetragen.</p>
+              ) : (
+                <div className="space-y-2">
+                  {bench.map((p) => (
+                    <div key={p.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2 flex items-center gap-2">
+                      <span className="text-[var(--text-tertiary)] text-sm w-6">{game.benchNumbers?.[p.id] ?? p.number ?? "–"}</span>
+                      <span className="text-[var(--text-primary)] text-base">{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
-            <p className="text-[var(--text-tertiary)] text-sm">Noch keine Angaben unter „Über uns" eingetragen.</p>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-3 mt-8">
+        <button
+          onClick={goPrev}
+          disabled={slide === 0}
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:hover:text-[var(--text-secondary)] border border-[var(--border-card)] rounded-md p-2"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        {SLIDES.map((label, i) => (
+          <button
+            key={label}
+            onClick={() => setSlide(i)}
+            className={
+              "text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors " +
+              (slide === i
+                ? "bg-[#c8102e] border-[#c8102e] text-white"
+                : "border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]")
+            }
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          onClick={goNext}
+          disabled={slide === SLIDES.length - 1}
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:hover:text-[var(--text-secondary)] border border-[var(--border-card)] rounded-md p-2"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
     </div>
   );
@@ -2480,8 +2747,9 @@ export default function App() {
   const [matches, setMatches, matchesLoaded] = useFirestoreValue("matches", []);
   const [creds, setCreds, credsLoaded] = useFirestoreValue("credentials", []);
   const [schedule, setSchedule, scheduleLoaded] = useFirestoreValue("schedule", []);
+  const [gameHistory, setGameHistory, gameHistoryLoaded] = useFirestoreValue("gameHistory", []);
 
-  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded;
+  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded && gameHistoryLoaded;
 
   if (!authChecked) {
     return (
@@ -2567,7 +2835,7 @@ export default function App() {
 
       <main className="px-4 sm:px-6 py-6">
         {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} matches={matches} />}
-        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} />}
+        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} />}
         {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} />}
         {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
       </main>
