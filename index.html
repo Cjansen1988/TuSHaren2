@@ -741,6 +741,7 @@ const emptyGame = {
   pressingLine: 50,
   directArrivalIds: [],
   focusImages: [],
+  opponentLogo: null,
   date: "",
   kickoff: "",
   meetingTime: "",
@@ -994,6 +995,20 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   const updateFocusImageCaption = (id, caption) => {
     setGame({ ...game, focusImages: (game.focusImages || []).map((i) => (i.id === id ? { ...i, caption } : i)) });
   };
+
+  const handleOpponentLogoChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageFile(file, 300);
+      setGame({ ...game, opponentLogo: dataUrl });
+    } catch (err) {
+      console.error("Wappen konnte nicht verarbeitet werden:", err);
+    }
+  };
+
+  const removeOpponentLogo = () => setGame({ ...game, opponentLogo: null });
 
   const setSlotPlayer = (slotId, playerId) => {
     const next = { ...lineup };
@@ -1703,7 +1718,25 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
-              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Über den Gegner</h3>
+              <div className="flex items-center gap-3 mb-3">
+                <label
+                  className="w-10 h-10 rounded-full bg-[var(--bg-input)] border border-[var(--border-input)] flex items-center justify-center text-[9px] text-[var(--text-secondary)] font-semibold shrink-0 cursor-pointer overflow-hidden text-center leading-tight"
+                  title="Gegner-Wappen hochladen"
+                >
+                  {game.opponentLogo ? (
+                    <img src={game.opponentLogo} alt="Gegner-Wappen" className="w-full h-full object-cover" />
+                  ) : (
+                    "Logo"
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleOpponentLogoChange} />
+                </label>
+                <h3 className="text-[var(--text-primary)] text-sm font-semibold flex-1">Über den Gegner</h3>
+                {game.opponentLogo && (
+                  <button onClick={removeOpponentLogo} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Tabellenplatz">
@@ -2829,8 +2862,17 @@ function PresentationView({ squad, game, onExit }) {
       <div className="flex items-center gap-5 mb-6">
         <ClubCrest size={64} />
         <div>
-          <h1 className="text-[var(--text-primary)] text-3xl font-bold tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
-            TUS HAREN 2 {game.opponentName ? `vs. ${game.opponentName}` : ""}
+          <h1 className="text-[var(--text-primary)] text-3xl font-bold tracking-wide flex items-center gap-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            TUS HAREN 2
+            {game.opponentName && (
+              <>
+                <span className="text-[var(--text-tertiary)] text-xl font-normal">vs.</span>
+                {game.opponentLogo && (
+                  <img src={game.opponentLogo} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white/20" />
+                )}
+                {game.opponentName}
+              </>
+            )}
           </h1>
           <div className="flex flex-wrap gap-4 mt-1 text-[var(--text-secondary)] text-lg">
             {game.date && <span>{formatDateDE(game.date)}</span>}
@@ -2849,7 +2891,10 @@ function PresentationView({ squad, game, onExit }) {
       <div className="flex-1 flex flex-col justify-center">
         {slide === 0 && (
           <div className="max-w-3xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
-            <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
+            <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6 flex items-center gap-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              {game.opponentLogo && (
+                <img src={game.opponentLogo} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-[var(--border-card)]" />
+              )}
               Über {game.opponentName || "den Gegner"}
             </h2>
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -2907,13 +2952,13 @@ function PresentationView({ squad, game, onExit }) {
             {game.opponentStrengths && (
               <div className="mb-4">
                 <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Stärken</div>
-                <div className="text-[var(--text-body)] text-lg">{game.opponentStrengths}</div>
+                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.opponentStrengths}</div>
               </div>
             )}
             {game.opponentWeaknesses && (
               <div>
                 <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Schwächen</div>
-                <div className="text-[var(--text-body)] text-lg">{game.opponentWeaknesses}</div>
+                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.opponentWeaknesses}</div>
               </div>
             )}
             {!game.opponentTablePosition && !game.opponentGoalDiff && !game.opponentFormation && !game.opponentKeyPlayers &&
@@ -2931,19 +2976,19 @@ function PresentationView({ squad, game, onExit }) {
             {game.ourTactics && (
               <div className="mb-4">
                 <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Taktische Idee</div>
-                <div className="text-[var(--text-body)] text-lg">{game.ourTactics}</div>
+                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.ourTactics}</div>
               </div>
             )}
             {game.ourNotes && (
               <div className="mb-4">
                 <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ausfälle / Sonstiges</div>
-                <div className="text-[var(--text-body)] text-lg">{game.ourNotes}</div>
+                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.ourNotes}</div>
               </div>
             )}
             {game.reviewNotes && (
               <div>
                 <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Rückblick</div>
-                <div className="text-[var(--text-body)] text-lg">{game.reviewNotes}</div>
+                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.reviewNotes}</div>
               </div>
             )}
             {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
