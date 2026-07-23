@@ -2390,8 +2390,9 @@ const TABS = [
 
 function PresentationView({ squad, game, onExit }) {
   const [slide, setSlide] = useState(0);
+  const [presTheme, setPresTheme] = useState("dark");
   const focusImages = game.focusImages || [];
-  const SLIDES = ["Gegner", "Spielidee & Infos", ...focusImages.map((_, i) => `Fokus ${i + 1}`), "Aufstellung"];
+  const SLIDES = ["Gegner", "Spielidee", ...focusImages.map((_, i) => `Fokus ${i + 1}`), "Aufstellung"];
 
   useEffect(() => {
     const el = document.documentElement;
@@ -2419,19 +2420,27 @@ function PresentationView({ squad, game, onExit }) {
   const assignedIds = Object.values(lineup).map((v) => v?.playerId).filter(Boolean);
   const getPlayer = (id) => squad.find((p) => p.id === id);
   const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
-  const directArrival = (game.directArrivalIds || []).map((id) => getPlayer(id)).filter(Boolean);
 
   const goPrev = () => setSlide((s) => Math.max(0, s - 1));
   const goNext = () => setSlide((s) => Math.min(SLIDES.length - 1, s + 1));
 
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative">
-      <button
-        onClick={onExit}
-        className="absolute top-6 right-6 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md px-3 py-2 text-sm flex items-center gap-1.5"
-      >
-        <X size={16} /> Beenden (Esc)
-      </button>
+    <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative" style={THEME_VARS[presTheme]}>
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        <button
+          onClick={() => setPresTheme((t) => (t === "dark" ? "light" : "dark"))}
+          className="flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md w-9 h-9"
+          title={presTheme === "dark" ? "Zu Hell wechseln" : "Zu Dunkel wechseln"}
+        >
+          {presTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+        <button
+          onClick={onExit}
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md px-3 py-2 text-sm flex items-center gap-1.5"
+        >
+          <X size={16} /> Beenden (Esc)
+        </button>
+      </div>
 
       <div className="flex items-center gap-5 mb-6">
         <ClubCrest size={64} />
@@ -2531,68 +2540,31 @@ function PresentationView({ squad, game, onExit }) {
         )}
 
         {slide === 1 && (
-          <div className="max-w-4xl mx-auto w-full grid md:grid-cols-2 gap-8">
-            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
-              <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                Unsere Spielidee
-              </h2>
-              {game.ourTactics && (
-                <div className="mb-4">
-                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Taktische Idee</div>
-                  <div className="text-[var(--text-body)] text-lg">{game.ourTactics}</div>
-                </div>
-              )}
-              {game.ourNotes && (
-                <div className="mb-4">
-                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ausfälle / Sonstiges</div>
-                  <div className="text-[var(--text-body)] text-lg">{game.ourNotes}</div>
-                </div>
-              )}
-              {game.reviewNotes && (
-                <div>
-                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Rückblick</div>
-                  <div className="text-[var(--text-body)] text-lg">{game.reviewNotes}</div>
-                </div>
-              )}
-              {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
-                <p className="text-[var(--text-tertiary)] text-base">Noch keine Angaben unter „Über uns" eingetragen.</p>
-              )}
-            </div>
-
-            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
-              <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                Spieltag-Infos
-              </h2>
-              <div className="space-y-4">
-                {game.location && (
-                  <div>
-                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ort / Anfahrt</div>
-                    <div className="text-[var(--text-body)] text-lg">{game.location}</div>
-                  </div>
-                )}
-                {game.meetingTime && (
-                  <div>
-                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Treffpunkt</div>
-                    <div className="text-[var(--text-body)] text-lg">{game.meetingTime}</div>
-                  </div>
-                )}
-                {game.jerseyColor && (
-                  <div>
-                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Trikotfarbe</div>
-                    <div className="text-[var(--text-body)] text-lg">{game.jerseyColor}</div>
-                  </div>
-                )}
-                {directArrival.length > 0 && (
-                  <div>
-                    <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Fährt direkt zum Spielort</div>
-                    <div className="text-[var(--text-body)] text-lg">{directArrival.map((p) => p.name).join(", ")}</div>
-                  </div>
-                )}
-                {!game.location && !game.meetingTime && !game.jerseyColor && directArrival.length === 0 && (
-                  <p className="text-[var(--text-tertiary)] text-base">Noch keine weiteren Angaben eingetragen.</p>
-                )}
+          <div className="max-w-3xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
+            <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              Unsere Spielidee
+            </h2>
+            {game.ourTactics && (
+              <div className="mb-4">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Taktische Idee</div>
+                <div className="text-[var(--text-body)] text-lg">{game.ourTactics}</div>
               </div>
-            </div>
+            )}
+            {game.ourNotes && (
+              <div className="mb-4">
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ausfälle / Sonstiges</div>
+                <div className="text-[var(--text-body)] text-lg">{game.ourNotes}</div>
+              </div>
+            )}
+            {game.reviewNotes && (
+              <div>
+                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Rückblick</div>
+                <div className="text-[var(--text-body)] text-lg">{game.reviewNotes}</div>
+              </div>
+            )}
+            {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
+              <p className="text-[var(--text-tertiary)] text-base">Noch keine Angaben unter „Über uns" eingetragen.</p>
+            )}
           </div>
         )}
 
