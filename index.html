@@ -228,6 +228,19 @@ function computePlayerStats(playerId, matches) {
   return { apps, minutes, avgMinutes, goals, assists, scorerPerGame, minutesPerScorer, yellow, red, subIn, subOut };
 }
 
+function findDuplicateNumbers(entries) {
+  const counts = {};
+  entries.forEach(({ number }) => {
+    if (number === "" || number == null) return;
+    counts[number] = (counts[number] || 0) + 1;
+  });
+  const dupSet = new Set();
+  entries.forEach(({ id, number }) => {
+    if (number !== "" && number != null && counts[number] > 1) dupSet.add(id);
+  });
+  return dupSet;
+}
+
 function resizeImageFile(file, maxSize = 200) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -884,6 +897,17 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
   const getPlayer = (id) => squad.find((p) => p.id === id);
 
+  const duplicateNumberIds = useMemo(() => {
+    const entries = [
+      ...Object.values(lineup)
+        .filter((e) => e?.playerId)
+        .map((e) => ({ id: e.playerId, number: e.number })),
+      ...bench.map((p) => ({ id: p.id, number: benchNumbers[p.id] ?? p.number })),
+    ];
+    return findDuplicateNumbers(entries);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineup, bench, benchNumbers]);
+
   /* ---- Pressinglinie: per Ziehen einstellbar ---- */
   const pitchRef = useRef(null);
   const gameRef = useRef(game);
@@ -1433,9 +1457,9 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                       value={entry?.playerId || ""}
                       onChange={(e) => setSlotPlayer(slot.id, e.target.value)}
                     >
-                      <option value="">{slot.label}</option>
+                      <option value="" style={{ color: "#122e23", backgroundColor: "#ffffff" }}>{slot.label}</option>
                       {options.map((p) => (
-                        <option key={p.id} value={p.id}>
+                        <option key={p.id} value={p.id} style={{ color: "#122e23", backgroundColor: "#ffffff" }}>
                           {p.number ? `#${p.number} ` : ""}
                           {shortName(p.name)}
                         </option>
@@ -1444,10 +1468,16 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                     {entry && (
                       <div className="flex gap-0.5">
                         <input
-                          className="w-8 text-[10px] text-center bg-[var(--bg-input)]/90 border border-[var(--border-input)] rounded text-[var(--text-body)] px-0.5 py-0.5"
+                          className={
+                            "w-8 text-[10px] text-center border rounded px-0.5 py-0.5" +
+                            (duplicateNumberIds.has(entry.playerId)
+                              ? " bg-[#e08a2e]/20 border-[#e08a2e] text-[#e08a2e] font-bold"
+                              : " bg-[var(--bg-input)]/90 border-[var(--border-input)] text-[var(--text-body)]")
+                          }
                           value={entry.number}
                           onChange={(e) => setSlotField(slot.id, "number", e.target.value)}
                           placeholder="Nr"
+                          title={duplicateNumberIds.has(entry.playerId) ? "Doppelt vergebene Rückennummer!" : undefined}
                         />
                         <input
                           className="w-12 text-[10px] text-center bg-[var(--bg-input)]/90 border border-[var(--border-input)] rounded text-[var(--text-body)] px-0.5 py-0.5"
@@ -1473,10 +1503,24 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {bench.map((p) => (
-                    <span key={p.id} className="flex items-center gap-1 text-xs bg-[var(--bg-card)] border border-[var(--border-card)] text-[var(--text-secondary)] pl-1 pr-2 py-1 rounded-full">
-                      <span className="text-[var(--text-secondary)]">#</span>
+                    <span
+                      key={p.id}
+                      className={
+                        "flex items-center gap-1 text-xs border pl-1 pr-2 py-1 rounded-full" +
+                        (duplicateNumberIds.has(p.id)
+                          ? " bg-[#e08a2e]/20 border-[#e08a2e] text-[#e08a2e]"
+                          : " bg-[var(--bg-card)] border-[var(--border-card)] text-[var(--text-secondary)]")
+                      }
+                      title={duplicateNumberIds.has(p.id) ? "Doppelt vergebene Rückennummer!" : undefined}
+                    >
+                      <span>#</span>
                       <input
-                        className="w-7 bg-[var(--bg-input)] border border-[var(--border-input)] rounded text-center text-[var(--text-body)] py-0.5"
+                        className={
+                          "w-7 rounded text-center py-0.5 border" +
+                          (duplicateNumberIds.has(p.id)
+                            ? " bg-[#e08a2e]/20 border-[#e08a2e] text-[#e08a2e] font-bold"
+                            : " bg-[var(--bg-input)] border-[var(--border-input)] text-[var(--text-body)]")
+                        }
                         value={benchNumbers[p.id] ?? p.number ?? ""}
                         onChange={(e) => setBenchNumber(p.id, e.target.value)}
                       />
@@ -2713,6 +2757,17 @@ function PresentationView({ squad, game, onExit }) {
   const getPlayer = (id) => squad.find((p) => p.id === id);
   const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
 
+  const duplicateNumberIds = useMemo(() => {
+    const entries = [
+      ...Object.values(lineup)
+        .filter((e) => e?.playerId)
+        .map((e) => ({ id: e.playerId, number: e.number })),
+      ...bench.map((p) => ({ id: p.id, number: game.benchNumbers?.[p.id] ?? p.number })),
+    ];
+    return findDuplicateNumbers(entries);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineup, bench, game.benchNumbers]);
+
   const shareText = useMemo(() => {
     const lineupNumbers = {};
     Object.values(lineup).forEach((entry) => {
@@ -2957,7 +3012,14 @@ function PresentationView({ squad, game, onExit }) {
                       </div>
                       {p && (
                         <div className="flex items-center justify-center gap-1 mt-0.5">
-                          <span className="bg-[#c8102e] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                          <span
+                            className={
+                              "text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center" +
+                              (duplicateNumberIds.has(p.id) ? " ring-2 ring-offset-1 ring-[#e08a2e]" : "")
+                            }
+                            style={{ background: duplicateNumberIds.has(p.id) ? "#e08a2e" : "#c8102e" }}
+                            title={duplicateNumberIds.has(p.id) ? "Doppelt vergebene Rückennummer!" : undefined}
+                          >
                             {entry.number || p.number || "–"}
                           </span>
                           <span className="text-[#6b6558] text-[10px] font-semibold uppercase tracking-wide">
@@ -2971,6 +3033,12 @@ function PresentationView({ squad, game, onExit }) {
               })}
             </div>
 
+            {duplicateNumberIds.size > 0 && (
+              <p className="max-w-3xl mx-auto mt-4 text-center text-[#e08a2e] text-sm font-semibold">
+                ⚠️ Orange markierte Nummern werden doppelt vergeben – bitte korrigieren.
+              </p>
+            )}
+
             <div className="max-w-3xl mx-auto mt-6">
               <h2 className="text-[var(--text-primary)] text-lg font-semibold mb-3 text-center" style={{ fontFamily: "'Oswald', sans-serif" }}>
                 Bank
@@ -2981,7 +3049,14 @@ function PresentationView({ squad, game, onExit }) {
                 <div className="flex flex-wrap gap-2 justify-center">
                   {bench.map((p) => (
                     <div key={p.id} className="bg-white rounded-xl px-3 py-2 shadow-lg border-b-4 border-[#c8102e] flex items-center gap-2">
-                      <span className="bg-[#c8102e] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                      <span
+                        className={
+                          "text-white text-[10px] font-bold rounded-full min-w-[20px] h-[20px] px-1 flex items-center justify-center shrink-0" +
+                          (duplicateNumberIds.has(p.id) ? " ring-2 ring-offset-1 ring-[#e08a2e]" : "")
+                        }
+                        style={{ background: duplicateNumberIds.has(p.id) ? "#e08a2e" : "#c8102e" }}
+                        title={duplicateNumberIds.has(p.id) ? "Doppelt vergebene Rückennummer!" : undefined}
+                      >
                         {game.benchNumbers?.[p.id] ?? p.number ?? "–"}
                       </span>
                       <span className="text-[#12271e] font-bold text-sm whitespace-nowrap" style={{ fontFamily: "'Oswald', sans-serif" }}>
