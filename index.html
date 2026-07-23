@@ -2109,8 +2109,8 @@ function FormChart({ matches }) {
   );
 }
 
-function StatsTab({ matches, setMatches }) {
-  const [view, setView] = useState("spiele"); // "spiele" | "spieler"
+function StatsTab({ matches, setMatches, seasonGoal, setSeasonGoal }) {
+  const [view, setView] = useState("spiele"); // "spiele" | "spieler" | "ziel"
   const [draft, setDraft] = useState({
     date: "",
     opponent: "",
@@ -2121,6 +2121,25 @@ function StatsTab({ matches, setMatches }) {
   });
   const [filter, setFilter] = useState("Alle");
   const [expanded, setExpanded] = useState({});
+
+  const competitiveStats = useMemo(() => {
+    let w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    (matches || [])
+      .filter((m) => (m.matchType || "Liga") !== "Testspiel")
+      .forEach((m) => {
+        const us = Number(m.scoreUs), them = Number(m.scoreThem);
+        if (Number.isNaN(us) || Number.isNaN(them)) return;
+        gf += us;
+        ga += them;
+        if (us > them) w++;
+        else if (us === them) d++;
+        else l++;
+      });
+    const played = w + d + l;
+    const points = w * 3 + d;
+    const avgPerGame = played > 0 ? points / played : 0;
+    return { w, d, l, gf, ga, played, points, avgPerGame };
+  }, [matches]);
 
   const addMatch = () => {
     if (!draft.opponent.trim() || draft.scoreUs === "" || draft.scoreThem === "") return;
@@ -2195,6 +2214,29 @@ function StatsTab({ matches, setMatches }) {
     return Object.values(stats).sort((a, b) => b.goals - a.goals || b.apps - a.apps);
   }, [filtered]);
 
+  const duoChemistry = useMemo(() => {
+    const pairs = {};
+    const nameById = {};
+    filtered.forEach((m) => {
+      (m.goals || []).forEach((g) => {
+        if (g.playerId) nameById[g.playerId] = g.playerName;
+        if (g.assistId) nameById[g.assistId] = g.assistName;
+        if (g.playerId && g.assistId && g.playerId !== g.assistId) {
+          const ids = [g.playerId, g.assistId].sort();
+          const key = ids.join("|");
+          pairs[key] = (pairs[key] || 0) + 1;
+        }
+      });
+    });
+    return Object.entries(pairs)
+      .map(([key, count]) => {
+        const [idA, idB] = key.split("|");
+        return { nameA: nameById[idA] || "?", nameB: nameById[idB] || "?", count };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [filtered]);
+
   const summary = useMemo(() => {
     let w = 0, d = 0, l = 0, gf = 0, ga = 0;
     filtered.forEach((m) => {
@@ -2220,6 +2262,7 @@ function StatsTab({ matches, setMatches }) {
         {[
           ["spiele", "Spiele"],
           ["spieler", "Spieler"],
+          ["ziel", "Saisonziel"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -2233,6 +2276,111 @@ function StatsTab({ matches, setMatches }) {
           </button>
         ))}
       </div>
+
+      {view === "ziel" && (
+        <div>
+          <p className="text-[var(--text-tertiary)] text-xs mb-4">
+            Zählt nur Liga- und Pokalspiele (Pflichtspiele) – Testspiele fließen bewusst nicht ein.
+          </p>
+
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Saisonziel festlegen</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Field label="Zielposition (optional)">
+                <input
+                  className={inputCls}
+                  placeholder="z.B. Platz 3"
+                  value={seasonGoal?.targetPosition || ""}
+                  onChange={(e) => setSeasonGoal({ ...seasonGoal, targetPosition: e.target.value })}
+                />
+              </Field>
+              <Field label="Ziel-Punkte">
+                <input
+                  className={inputCls}
+                  inputMode="numeric"
+                  placeholder="z.B. 50"
+                  value={seasonGoal?.targetPoints || ""}
+                  onChange={(e) => setSeasonGoal({ ...seasonGoal, targetPoints: e.target.value.replace(/\D/, "") })}
+                />
+              </Field>
+              <Field label="Pflichtspiele gesamt (Saison)">
+                <input
+                  className={inputCls}
+                  inputMode="numeric"
+                  placeholder="z.B. 26"
+                  value={seasonGoal?.totalGames || ""}
+                  onChange={(e) => setSeasonGoal({ ...seasonGoal, totalGames: e.target.value.replace(/\D/, "") })}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6">
+            {[
+              ["Spiele", competitiveStats.played, "#e8e6df"],
+              ["Siege", competitiveStats.w, "#3fae6b"],
+              ["Unent.", competitiveStats.d, "#c8a13f"],
+              ["Nied.", competitiveStats.l, "#c8102e"],
+              ["Punkte", competitiveStats.points, "#e8e6df"],
+              ["Ø Pkt/Spiel", competitiveStats.avgPerGame.toFixed(2), "#e8e6df"],
+            ].map(([label, val, color]) => (
+              <div key={label} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg py-3 text-center">
+                <div className="text-xl font-bold" style={{ color, fontFamily: "'Oswald', sans-serif" }}>
+                  {val}
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {seasonGoal?.targetPoints && (
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Fortschritt zum Ziel</h3>
+              {(() => {
+                const target = Number(seasonGoal.targetPoints) || 0;
+                const total = Number(seasonGoal.totalGames) || 0;
+                const remainingGames = total > competitiveStats.played ? total - competitiveStats.played : 0;
+                const remainingPoints = Math.max(0, target - competitiveStats.points);
+                const neededAvg = remainingGames > 0 ? remainingPoints / remainingGames : null;
+                const pct = target > 0 ? Math.min(100, Math.round((competitiveStats.points / target) * 100)) : 0;
+                const onTrack = neededAvg === null ? competitiveStats.points >= target : neededAvg <= competitiveStats.avgPerGame + 0.001;
+
+                return (
+                  <>
+                    <div className="w-full bg-[var(--bg-input)] rounded-full h-3 mb-2 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${pct}%`, background: onTrack ? "#3fae6b" : "#e08a2e" }}
+                      />
+                    </div>
+                    <p className="text-[var(--text-secondary)] text-xs mb-3">
+                      {competitiveStats.points} von {target} Punkten ({pct}%)
+                      {seasonGoal.targetPosition ? ` · Ziel: ${seasonGoal.targetPosition}` : ""}
+                    </p>
+                    {total > 0 ? (
+                      remainingGames > 0 ? (
+                        <p className={"text-sm font-semibold " + (onTrack ? "text-[#3fae6b]" : "text-[#e08a2e]")}>
+                          {onTrack
+                            ? `Im Soll – ${neededAvg.toFixed(2)} Punkte/Spiel reichen für den Rest der Saison (aktuell ${competitiveStats.avgPerGame.toFixed(2)}).`
+                            : `Ihr braucht ${neededAvg.toFixed(2)} Punkte/Spiel im Schnitt, um das Ziel noch zu erreichen (aktuell ${competitiveStats.avgPerGame.toFixed(2)}).`}
+                        </p>
+                      ) : (
+                        <p className={"text-sm font-semibold " + (competitiveStats.points >= target ? "text-[#3fae6b]" : "text-[#c8102e]")}>
+                          {competitiveStats.points >= target ? "Ziel erreicht! 🎉" : "Saison beendet – Ziel leider verpasst."}
+                        </p>
+                      )
+                    ) : (
+                      <p className="text-[var(--text-tertiary)] text-xs">
+                        Tragt „Pflichtspiele gesamt" ein, um zu sehen, ob ihr im Soll liegt.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
 
       {view === "spieler" && (
         <div>
@@ -2272,6 +2420,25 @@ function StatsTab({ matches, setMatches }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {duoChemistry.length > 0 && (
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mt-6">
+              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Sturmduo-Chemie</h3>
+              <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+                Welche zwei Spieler kombinieren am häufigsten bei Toren (Torschütze + Vorlagengeber)?
+              </p>
+              <div className="space-y-1.5">
+                {duoChemistry.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between bg-[var(--bg-input)] rounded-md px-3 py-2 text-sm">
+                    <span className="text-[var(--text-body)]">
+                      {d.nameA} <span className="text-[var(--text-tertiary)]">&amp;</span> {d.nameB}
+                    </span>
+                    <span className="text-[var(--text-primary)] font-bold tabular-nums">{d.count}×</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -2415,10 +2582,6 @@ function StatsTab({ matches, setMatches }) {
     </div>
   );
 }
-
-/* ---------------------------------------------------------------------- */
-/*  Tab: Info (Logins / Passwörter)                                         */
-/* ---------------------------------------------------------------------- */
 
 function InfoTab({ creds, setCreds }) {
   const [draft, setDraft] = useState({ service: "", username: "", password: "", notes: "" });
@@ -3212,8 +3375,9 @@ export default function App() {
   const [schedule, setSchedule, scheduleLoaded] = useFirestoreValue("schedule", []);
   const [gameHistory, setGameHistory, gameHistoryLoaded] = useFirestoreValue("gameHistory", []);
   const [laundry, setLaundry, laundryLoaded] = useFirestoreValue("laundry", []);
+  const [seasonGoal, setSeasonGoal, seasonGoalLoaded] = useFirestoreValue("seasonGoal", { targetPosition: "", targetPoints: "", totalGames: "" });
 
-  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded && gameHistoryLoaded && laundryLoaded;
+  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded && gameHistoryLoaded && laundryLoaded && seasonGoalLoaded;
 
   if (!authChecked) {
     return (
@@ -3300,7 +3464,7 @@ export default function App() {
       <main className="px-4 sm:px-6 py-6">
         {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} matches={matches} />}
         {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} />}
-        {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} />}
+        {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} seasonGoal={seasonGoal} setSeasonGoal={setSeasonGoal} />}
         {tab === "waesche" && <LaundryTab squad={squad} schedule={schedule} laundry={laundry} setLaundry={setLaundry} />}
         {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
       </main>
