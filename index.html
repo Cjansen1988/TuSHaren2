@@ -40,7 +40,7 @@ import ReactDOM from "react-dom/client";
 import {
   Users, Shield, BarChart3, KeyRound, Plus, Trash2, Eye, EyeOff,
   Lock, ChevronRight, ChevronLeft, Save, AlertCircle, LogOut, Mail, CreditCard,
-  Sun, Moon, Monitor, X
+  Sun, Moon, Monitor, X, QrCode, Shirt
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -667,16 +667,16 @@ const FORMATIONS = {
   ],
   "4-2-3-1": [
     { id: "TW", label: "TW", x: 50, y: 92 },
-    { id: "LV", label: "LV", x: 14, y: 72 },
-    { id: "IV1", label: "IV", x: 36, y: 78 },
-    { id: "IV2", label: "IV", x: 64, y: 78 },
-    { id: "RV", label: "RV", x: 86, y: 72 },
-    { id: "DM1", label: "DM", x: 36, y: 58 },
-    { id: "DM2", label: "DM", x: 64, y: 58 },
-    { id: "OML", label: "OM", x: 20, y: 35 },
-    { id: "OMZ", label: "OM", x: 50, y: 38 },
-    { id: "OMR", label: "OM", x: 80, y: 35 },
-    { id: "ST", label: "ST", x: 50, y: 14 },
+    { id: "LV", label: "LV", x: 9, y: 74 },
+    { id: "IV1", label: "IV", x: 35, y: 80 },
+    { id: "IV2", label: "IV", x: 65, y: 80 },
+    { id: "RV", label: "RV", x: 91, y: 74 },
+    { id: "DM1", label: "ZM", x: 31, y: 58 },
+    { id: "DM2", label: "ZM", x: 69, y: 58 },
+    { id: "OML", label: "LM", x: 9, y: 33 },
+    { id: "OMZ", label: "ZOM", x: 50, y: 40 },
+    { id: "OMR", label: "RM", x: 91, y: 33 },
+    { id: "ST", label: "ST", x: 50, y: 12 },
   ],
   "3-5-2": [
     { id: "TW", label: "TW", x: 50, y: 92 },
@@ -1974,6 +1974,63 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   );
 }
 
+function FormChart({ matches }) {
+  const data = (matches || [])
+    .filter((m) => m.scoreUs !== "" && m.scoreThem !== "" && m.scoreUs != null && m.scoreThem != null)
+    .slice()
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((m) => ({ date: m.date, opponent: m.opponent, gf: Number(m.scoreUs), ga: Number(m.scoreThem) }));
+
+  if (data.length < 2) return null;
+
+  const w = 640;
+  const h = 200;
+  const pad = 30;
+  const maxY = Math.max(1, ...data.map((d) => Math.max(d.gf, d.ga)));
+  const stepX = data.length > 1 ? (w - pad * 2) / (data.length - 1) : 0;
+  const scaleX = (i) => pad + i * stepX;
+  const scaleY = (v) => h - pad - (v / maxY) * (h - pad * 2);
+  const linePath = (key) => data.map((d, i) => `${i === 0 ? "M" : "L"} ${scaleX(i)} ${scaleY(d[key])}`).join(" ");
+
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[var(--text-primary)] text-sm font-semibold">Formkurve</h3>
+        <div className="flex items-center gap-3 text-[10px] text-[var(--text-secondary)]">
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: "#3fae6b" }} /> Tore
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: "#c8102e" }} /> Gegentore
+          </span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-40">
+        {[0, 1, 2, 3].map((i) => (
+          <line
+            key={i}
+            x1={pad}
+            x2={w - pad}
+            y1={pad + (i * (h - pad * 2)) / 3}
+            y2={pad + (i * (h - pad * 2)) / 3}
+            stroke="var(--border-card)"
+            strokeWidth="1"
+          />
+        ))}
+        <path d={linePath("gf")} fill="none" stroke="#3fae6b" strokeWidth="2.5" />
+        <path d={linePath("ga")} fill="none" stroke="#c8102e" strokeWidth="2.5" />
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle cx={scaleX(i)} cy={scaleY(d.gf)} r="3.5" fill="#3fae6b" />
+            <circle cx={scaleX(i)} cy={scaleY(d.ga)} r="3.5" fill="#c8102e" />
+            <title>{`${formatDateDE(d.date)} vs ${d.opponent}: ${d.gf}:${d.ga}`}</title>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function StatsTab({ matches, setMatches }) {
   const [view, setView] = useState("spiele"); // "spiele" | "spieler"
   const [draft, setDraft] = useState({
@@ -2177,6 +2234,8 @@ function StatsTab({ matches, setMatches }) {
         ))}
       </div>
 
+      <FormChart matches={filtered} />
+
       <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
         <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Spiel manuell eintragen</h3>
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-3">
@@ -2374,6 +2433,236 @@ function InfoTab({ creds, setCreds }) {
 }
 
 /* ---------------------------------------------------------------------- */
+/*  Tab: Trikotwäsche                                                       */
+/* ---------------------------------------------------------------------- */
+
+function LaundryTab({ squad, schedule, laundry, setLaundry }) {
+  const [draft, setDraft] = useState({ date: "", opponent: "", jerseyWasherId: "", warmupWasherId: "" });
+  const [copyState, setCopyState] = useState("idle"); // idle | copied | failed
+
+  const addEntry = () => {
+    if (!draft.date && !draft.opponent.trim()) return;
+    setLaundry([...(laundry || []), { id: uid(), ...draft }]);
+    setDraft({ date: "", opponent: "", jerseyWasherId: "", warmupWasherId: "" });
+  };
+
+  const removeEntry = (id) => setLaundry((laundry || []).filter((e) => e.id !== id));
+
+  const updateEntry = (id, field, value) =>
+    setLaundry((laundry || []).map((e) => (e.id === id ? { ...e, [field]: value } : e)));
+
+  const generateFromSchedule = () => {
+    if (!squad || squad.length === 0) return;
+    const existingKeys = new Set((laundry || []).map((e) => `${e.date}_${e.opponent}`));
+    const newFixtures = (schedule || [])
+      .filter((f) => !existingKeys.has(`${f.date}_${f.opponent}`))
+      .slice()
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (newFixtures.length === 0) return;
+
+    const tally = {};
+    squad.forEach((p) => {
+      tally[p.id] = { jersey: 0, warmup: 0 };
+    });
+    (laundry || []).forEach((e) => {
+      if (e.jerseyWasherId && tally[e.jerseyWasherId]) tally[e.jerseyWasherId].jersey += 1;
+      if (e.warmupWasherId && tally[e.warmupWasherId]) tally[e.warmupWasherId].warmup += 1;
+    });
+
+    const pickFair = (role, excludeId) => {
+      const candidates = squad.filter((p) => p.id !== excludeId);
+      if (candidates.length === 0) return "";
+      candidates.sort((a, b) => tally[a.id][role] - tally[b.id][role]);
+      const chosen = candidates[0];
+      tally[chosen.id][role] += 1;
+      return chosen.id;
+    };
+
+    const newEntries = newFixtures.map((f) => {
+      const jerseyId = pickFair("jersey", null);
+      const warmupId = pickFair("warmup", jerseyId);
+      return { id: uid(), date: f.date, opponent: f.opponent, jerseyWasherId: jerseyId, warmupWasherId: warmupId };
+    });
+
+    setLaundry([...(laundry || []), ...newEntries]);
+  };
+
+  const counts = useMemo(() => {
+    const c = {};
+    (squad || []).forEach((p) => {
+      c[p.id] = { name: p.name, jersey: 0, warmup: 0 };
+    });
+    (laundry || []).forEach((e) => {
+      if (e.jerseyWasherId && c[e.jerseyWasherId]) c[e.jerseyWasherId].jersey += 1;
+      if (e.warmupWasherId && c[e.warmupWasherId]) c[e.warmupWasherId].warmup += 1;
+    });
+    return Object.values(c).sort((a, b) => a.jersey + a.warmup - (b.jersey + b.warmup));
+  }, [squad, laundry]);
+
+  const sorted = (laundry || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const getPlayerName = (id) => squad.find((p) => p.id === id)?.name || "–";
+
+  const shareMessage = useMemo(() => {
+    const chronological = (laundry || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+    const lines = ["🧺 Trikot- & Warm-Up-Wäsche", ""];
+    chronological.forEach((e) => {
+      lines.push(`${formatDateDE(e.date) || "–"}${e.opponent ? ` vs. ${e.opponent}` : ""}`);
+      lines.push(`👕 Trikots: ${getPlayerName(e.jerseyWasherId)}`);
+      lines.push(`🎽 Warm-Up: ${getPlayerName(e.warmupWasherId)}`);
+      lines.push("");
+    });
+    return lines.join("\n").trim();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laundry, squad]);
+
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(shareMessage);
+    setCopyState(ok ? "copied" : "failed");
+    setTimeout(() => setCopyState("idle"), 2500);
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <h2 className="text-[var(--text-primary)] text-xl mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        TRIKOTWÄSCHE
+      </h2>
+
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+        <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Automatisch aus dem Spielplan</h3>
+        <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+          Erstellt für alle noch fehlenden Spiele aus dem importierten Spielplan (Tab „Aktuelles Spiel" → „Spielplan")
+          automatisch einen Eintrag und verteilt Trikots/Warm-Up fair – wer am wenigsten dran war, kommt zuerst.
+        </p>
+        <button
+          onClick={generateFromSchedule}
+          className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md"
+        >
+          <Plus size={15} /> Aus Spielplan generieren
+        </button>
+      </div>
+
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+        <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Neuer Eintrag</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          <input
+            type="date"
+            className={inputCls}
+            value={draft.date}
+            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+          />
+          <input
+            className={inputCls}
+            placeholder="Gegner (optional)"
+            value={draft.opponent}
+            onChange={(e) => setDraft({ ...draft, opponent: e.target.value })}
+          />
+          <select className={inputCls} value={draft.jerseyWasherId} onChange={(e) => setDraft({ ...draft, jerseyWasherId: e.target.value })}>
+            <option value="">Trikots wäscht</option>
+            {squad.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <select className={inputCls} value={draft.warmupWasherId} onChange={(e) => setDraft({ ...draft, warmupWasherId: e.target.value })}>
+            <option value="">Warm-Up wäscht</option>
+            {squad.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+        <button onClick={addEntry} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md">
+          <Plus size={15} /> Eintragen
+        </button>
+      </div>
+
+      {sorted.length === 0 ? (
+        <p className="text-[var(--text-tertiary)] text-sm mb-6">Noch keine Einträge.</p>
+      ) : (
+        <div className="space-y-1.5 mb-8">
+          {sorted.map((e) => (
+            <div key={e.id} className="flex flex-wrap items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2">
+              <div className="w-24 text-xs text-[var(--text-secondary)] shrink-0">{formatDateDE(e.date) || "–"}</div>
+              <div className="flex-1 min-w-[80px] text-sm text-[var(--text-primary)] truncate">{e.opponent || "–"}</div>
+              <select
+                className="bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-xs text-[var(--text-body)] px-2 py-1"
+                value={e.jerseyWasherId}
+                onChange={(ev) => updateEntry(e.id, "jerseyWasherId", ev.target.value)}
+              >
+                <option value="">Trikots: –</option>
+                {squad.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <select
+                className="bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-xs text-[var(--text-body)] px-2 py-1"
+                value={e.warmupWasherId}
+                onChange={(ev) => updateEntry(e.id, "warmupWasherId", ev.target.value)}
+              >
+                <option value="">Warm-Up: –</option>
+                {squad.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <button onClick={() => removeEntry(e.id)} className="text-[var(--text-tertiary)] hover:text-[#ff8a8a] shrink-0">
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
+        <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Wer war wie oft dran?</h3>
+        <p className="text-[var(--text-tertiary)] text-[11px] mb-3">Hilft, die Wäsche fair zu verteilen – wenigste Einsätze zuerst.</p>
+        {counts.length === 0 ? (
+          <p className="text-[var(--text-tertiary)] text-sm">Erst Spieler im Tab „Kader" anlegen.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-wide text-[var(--text-secondary)] border-b border-[var(--border-card)]">
+                  <th className="py-2 pr-2">Spieler</th>
+                  <th className="py-2 px-2 text-center">Trikots</th>
+                  <th className="py-2 px-2 text-center">Warm-Up</th>
+                </tr>
+              </thead>
+              <tbody>
+                {counts.map((c, i) => (
+                  <tr key={i} className="border-b border-[var(--bg-input)] text-[var(--text-body)]">
+                    <td className="py-1.5 pr-2">{c.name}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{c.jersey}</td>
+                    <td className="py-1.5 px-2 text-center tabular-nums">{c.warmup}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {sorted.length > 0 && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mt-6">
+          <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Als Nachricht teilen</h3>
+          <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+            Fasst alle Einträge zusammen – kopieren und in eure WhatsApp-Gruppe einfügen.
+          </p>
+          <pre className="whitespace-pre-wrap break-words bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md p-3 text-sm text-[var(--text-body)] leading-relaxed mb-3">
+            {shareMessage}
+          </pre>
+          <button
+            onClick={handleCopy}
+            className="w-full flex items-center justify-center gap-2 bg-[#c8102e] hover:bg-[#a80d26] text-white font-semibold py-2.5 rounded-md text-sm"
+          >
+            <Save size={15} />
+            {copyState === "copied" ? "Kopiert!" : copyState === "failed" ? "Kopieren fehlgeschlagen – bitte manuell markieren" : "Nachricht kopieren"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
 /*  App shell                                                               */
 /* ---------------------------------------------------------------------- */
 
@@ -2381,6 +2670,7 @@ const TABS = [
   { id: "kader", label: "Kader", icon: Users },
   { id: "spiel", label: "Aktuelles Spiel", icon: Shield },
   { id: "statistik", label: "Statistik", icon: BarChart3 },
+  { id: "waesche", label: "Wäsche", icon: Shirt },
   { id: "info", label: "Info", icon: KeyRound },
 ];
 
@@ -2391,6 +2681,7 @@ const TABS = [
 function PresentationView({ squad, game, onExit }) {
   const [slide, setSlide] = useState(0);
   const [presTheme, setPresTheme] = useState("dark");
+  const [showQr, setShowQr] = useState(false);
   const focusImages = game.focusImages || [];
   const SLIDES = ["Gegner", "Spielidee", ...focusImages.map((_, i) => `Fokus ${i + 1}`), "Aufstellung"];
 
@@ -2421,12 +2712,49 @@ function PresentationView({ squad, game, onExit }) {
   const getPlayer = (id) => squad.find((p) => p.id === id);
   const bench = squad.filter((p) => matchSquad.includes(p.id) && !assignedIds.includes(p.id));
 
+  const shareText = useMemo(() => {
+    const lineupNumbers = {};
+    Object.values(lineup).forEach((entry) => {
+      if (entry?.playerId) lineupNumbers[entry.playerId] = entry.number;
+    });
+    const kaderLines = matchSquad
+      .map((id) => getPlayer(id))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const na = Number(lineupNumbers[a.id] ?? a.number) || 99;
+        const nb = Number(lineupNumbers[b.id] ?? b.number) || 99;
+        return na - nb;
+      })
+      .map((p) => `${lineupNumbers[p.id] ?? p.number ?? "–"} – ${p.name}`)
+      .join("\n");
+    const lines = [
+      `TuS Haren 2 vs. ${game.opponentName || "–"}`,
+      `${formatDateDE(game.date) || ""} ${game.kickoff ? `${game.kickoff} Uhr` : ""}`.trim(),
+      game.meetingTime ? `Treffpunkt: ${game.meetingTime}` : "",
+      game.jerseyColor ? `Trikot: ${game.jerseyColor}` : "",
+      "",
+      "Kader:",
+      kaderLines,
+    ].filter((l) => l !== "");
+    return lines.join("\n");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, matchSquad, lineup, squad]);
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(shareText)}`;
+
   const goPrev = () => setSlide((s) => Math.max(0, s - 1));
   const goNext = () => setSlide((s) => Math.min(SLIDES.length - 1, s + 1));
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative" style={THEME_VARS[presTheme]}>
       <div className="absolute top-6 right-6 flex items-center gap-2">
+        <button
+          onClick={() => setShowQr(true)}
+          className="flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md w-9 h-9"
+          title="QR-Code für Spieler anzeigen"
+        >
+          <QrCode size={16} />
+        </button>
         <button
           onClick={() => setPresTheme((t) => (t === "dark" ? "light" : "dark"))}
           className="flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] rounded-md w-9 h-9"
@@ -2584,27 +2912,30 @@ function PresentationView({ squad, game, onExit }) {
         ))}
 
         {slide === SLIDES.length - 1 && (
-          <div className="grid lg:grid-cols-3 gap-8 w-full">
-            <div className="lg:col-span-2">
+          <div className="grid lg:grid-cols-4 gap-8 w-full items-start">
+            <div className="lg:col-span-3">
               <div
-                className="relative w-full max-w-xl mx-auto rounded-xl border-2 border-[#e8e6df]/30 overflow-hidden"
+                className="relative w-full max-w-2xl mx-auto rounded-2xl border-2 border-white/20 overflow-hidden shadow-2xl"
                 style={{
-                  aspectRatio: "0.68",
-                  background: "repeating-linear-gradient(to bottom, #1c5238 0, #1c5238 11.11%, #1a4a32 11.11%, #1a4a32 22.22%)",
+                  aspectRatio: "0.7",
+                  background: "repeating-linear-gradient(to bottom, #1d5a3d 0, #1d5a3d 11.11%, #1a5236 11.11%, #1a5236 22.22%)",
                 }}
               >
-                <div className="absolute inset-3 border border-white/25 rounded-sm pointer-events-none" />
-                <div className="absolute top-1/2 left-3 right-3 h-px bg-white/25 -translate-y-1/2 pointer-events-none" />
-                <div className="absolute left-1/2 top-1/2 w-24 h-24 border border-white/25 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-                <div className="absolute left-1/2 bottom-3 w-2/5 h-[14%] border border-white/25 border-b-0 -translate-x-1/2 pointer-events-none" />
-                <div className="absolute left-1/2 top-3 w-2/5 h-[14%] border border-white/25 border-t-0 -translate-x-1/2 pointer-events-none" />
+                <div className="absolute inset-4 border-2 border-white/30 rounded-sm pointer-events-none" />
+                <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-white/30 -translate-y-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 top-1/2 w-28 h-28 border-2 border-white/30 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 top-1/2 w-1.5 h-1.5 bg-white/40 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 bottom-4 w-2/5 h-[15%] border-2 border-white/30 border-b-0 -translate-x-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 bottom-4 w-1/5 h-[6%] border-2 border-white/30 border-b-0 -translate-x-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 top-4 w-2/5 h-[15%] border-2 border-white/30 border-t-0 -translate-x-1/2 pointer-events-none" />
+                <div className="absolute left-1/2 top-4 w-1/5 h-[6%] border-2 border-white/30 border-t-0 -translate-x-1/2 pointer-events-none" />
 
                 <div
-                  className="absolute left-0 right-0 border-t-2 border-dashed pointer-events-none"
+                  className="absolute left-0 right-0 border-t-2 border-dashed pointer-events-none z-10"
                   style={{ top: `${game.pressingLine ?? 50}%`, borderColor: "#ffd54a" }}
                 >
                   <div
-                    className="absolute left-2 -translate-y-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    className="absolute left-3 -translate-y-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full shadow"
                     style={{ background: "#ffd54a", color: "#122e23" }}
                   >
                     Pressing
@@ -2617,12 +2948,23 @@ function PresentationView({ squad, game, onExit }) {
                   return (
                     <div
                       key={slot.id}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20"
                       style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                     >
-                      <div className="bg-white/95 border-2 border-[#c8102e] rounded-full px-2.5 py-1 shadow text-center min-w-[80px]">
-                        <div className="text-[#122e23] font-bold text-sm leading-tight">{p ? p.name : slot.label}</div>
-                        {p && <div className="text-[#c8102e] text-[10px] font-semibold">#{entry.number || p.number || "–"}</div>}
+                      <div className="bg-white rounded-xl px-3 py-2 shadow-lg text-center whitespace-nowrap border-b-4 border-[#c8102e]">
+                        <div className="text-[#12271e] font-bold text-base leading-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                          {p ? p.name : slot.label}
+                        </div>
+                        {p && (
+                          <div className="flex items-center justify-center gap-1 mt-0.5">
+                            <span className="bg-[#c8102e] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                              {entry.number || p.number || "–"}
+                            </span>
+                            <span className="text-[#6b6558] text-[10px] font-semibold uppercase tracking-wide">
+                              {entry.position || slot.label}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -2637,11 +2979,15 @@ function PresentationView({ squad, game, onExit }) {
               {bench.length === 0 ? (
                 <p className="text-[var(--text-tertiary)] text-sm">Keine Bankspieler eingetragen.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
                   {bench.map((p) => (
-                    <div key={p.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2 flex items-center gap-2">
-                      <span className="text-[var(--text-tertiary)] text-sm w-6">{game.benchNumbers?.[p.id] ?? p.number ?? "–"}</span>
-                      <span className="text-[var(--text-primary)] text-base">{p.name}</span>
+                    <div key={p.id} className="bg-white rounded-xl px-3 py-2 shadow-lg border-b-4 border-[#c8102e] flex items-center gap-2">
+                      <span className="bg-[#c8102e] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                        {game.benchNumbers?.[p.id] ?? p.number ?? "–"}
+                      </span>
+                      <span className="text-[#12271e] font-bold text-sm whitespace-nowrap" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                        {p.name}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -2681,6 +3027,29 @@ function PresentationView({ squad, game, onExit }) {
           <ChevronRight size={18} />
         </button>
       </div>
+
+      {showQr && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4"
+          onClick={() => setShowQr(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 flex flex-col items-center max-w-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img src={qrUrl} alt="QR-Code mit Kader und Spieltag-Infos" className="w-64 h-64" />
+            <p className="text-[#122e23] text-sm mt-3 text-center">
+              Kader &amp; Spieltag-Infos mit dem Handy scannen
+            </p>
+            <button
+              onClick={() => setShowQr(false)}
+              className="mt-4 text-xs text-stone-500 hover:text-stone-700 underline"
+            >
+              Schließen
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2720,8 +3089,9 @@ export default function App() {
   const [creds, setCreds, credsLoaded] = useFirestoreValue("credentials", []);
   const [schedule, setSchedule, scheduleLoaded] = useFirestoreValue("schedule", []);
   const [gameHistory, setGameHistory, gameHistoryLoaded] = useFirestoreValue("gameHistory", []);
+  const [laundry, setLaundry, laundryLoaded] = useFirestoreValue("laundry", []);
 
-  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded && gameHistoryLoaded;
+  const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded && gameHistoryLoaded && laundryLoaded;
 
   if (!authChecked) {
     return (
@@ -2809,6 +3179,7 @@ export default function App() {
         {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} matches={matches} />}
         {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} />}
         {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} />}
+        {tab === "waesche" && <LaundryTab squad={squad} schedule={schedule} laundry={laundry} setLaundry={setLaundry} />}
         {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
       </main>
     </div>
