@@ -2829,7 +2829,9 @@ function PresentationView({ squad, game, onExit }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, matchSquad, lineup, squad]);
 
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(shareText)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
+    `https://wa.me/?text=${encodeURIComponent(shareText)}`
+  )}`;
 
   const goPrev = () => setSlide((s) => Math.max(0, s - 1));
   const goNext = () => setSlide((s) => Math.min(SLIDES.length - 1, s + 1));
@@ -3159,7 +3161,7 @@ function PresentationView({ squad, game, onExit }) {
           >
             <img src={qrUrl} alt="QR-Code mit Kader und Spieltag-Infos" className="w-64 h-64" />
             <p className="text-[#122e23] text-sm mt-3 text-center">
-              Kader &amp; Spieltag-Infos mit dem Handy scannen
+              Scannen öffnet WhatsApp mit Kader &amp; Spieltag-Infos vorausgefüllt
             </p>
             <button
               onClick={() => setShowQr(false)}
