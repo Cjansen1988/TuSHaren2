@@ -358,6 +358,84 @@ function normalizeTeamName(s) {
     .replace(/[^a-zäöüß0-9]/g, "");
 }
 
+function parseTabularSchedule(text, ourKeyword) {
+  if (!text || !text.trim()) return [];
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const dateRe = /(\d{1,2})\.(\d{1,2})\.(\d{2,4})/;
+  const timeRe = /(\d{1,2}):(\d{2})/;
+  const dayRe = /\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\.?\b/i;
+  const kw = ourKeyword || "haren";
+  const kwEsc = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const startRe = new RegExp(`^((?:\\S+\\s+)?\\S*${kwEsc}\\S*(?:\\s+(?:\\d+|I{1,3}))?)`, "i");
+  const endRe = new RegExp(`((?:\\S+\\s+)?\\S*${kwEsc}\\S*(?:\\s+(?:\\d+|I{1,3}))?)$`, "i");
+
+  const fixtures = [];
+
+  for (const line of lines) {
+    if (/^datum\b/i.test(line)) continue; // Kopfzeile überspringen
+
+    const dateMatch = line.match(dateRe);
+    const timeMatch = line.match(timeRe);
+    if (!dateMatch || !timeMatch) continue;
+
+    let [, d, m, y] = dateMatch;
+    if (y.length === 2) y = (Number(y) < 50 ? "20" : "19") + y;
+    d = d.padStart(2, "0");
+    m = m.padStart(2, "0");
+    const date = `${y}-${m}-${d}`;
+    const time = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
+
+    let home = null;
+    let away = null;
+
+    // Bevorzugt: sauber getrennte Spalten (Tabs oder mehrere Leerzeichen erhalten)
+    const cols = line.split(/\t+|\s{2,}/).map((c) => c.trim()).filter(Boolean);
+    if (cols.length >= 5) {
+      const rest = cols.filter((c) => !dateRe.test(c) && !timeRe.test(c) && !dayRe.test(c));
+      if (rest.length >= 2) {
+        home = rest[0];
+        away = rest[1];
+      }
+    }
+
+    // Fallback: alles zu einer Zeile mit Einzel-Leerzeichen verschmolzen –
+    // anhand des eigenen Vereinsnamens (ourKeyword) trennen wir Heim/Auswärts.
+    if (!home || !away) {
+      const rest = line.replace(dateRe, "").replace(dayRe, "").replace(timeRe, "").trim().replace(/\s{2,}/g, " ");
+      const startMatch = rest.match(startRe);
+      if (startMatch && startMatch.index === 0) {
+        home = startMatch[1].trim();
+        away = rest.slice(startMatch[1].length).trim();
+      } else {
+        const endMatch = rest.match(endRe);
+        if (endMatch) {
+          away = endMatch[1].trim();
+          home = rest.slice(0, rest.length - endMatch[1].length).trim();
+        }
+      }
+    }
+
+    if (!home || !away) continue;
+
+    const homeIsUs = normalizeTeamName(home).includes(normalizeTeamName(kw));
+    const awayIsUs = normalizeTeamName(away).includes(normalizeTeamName(kw));
+    let opponent, homeAway;
+    if (homeIsUs) {
+      opponent = away;
+      homeAway = "Heim";
+    } else if (awayIsUs) {
+      opponent = home;
+      homeAway = "Auswärts";
+    } else {
+      continue;
+    }
+
+    fixtures.push({ id: uid(), date, time, competition: "", opponent, homeAway, matchType: "Liga" });
+  }
+
+  return fixtures;
+}
+
 function parseFussballDeSchedule(text, ourKeyword) {
   if (!text || !text.trim()) return [];
   const lines = text.split(/\r?\n/);
@@ -1090,7 +1168,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
   /* ---- Spielplan-Import (fussball.de Copy & Paste) ---- */
   const importSchedule = () => {
-    const parsed = parseFussballDeSchedule(pasteText, "haren");
+    let parsed = parseFussballDeSchedule(pasteText, "haren");
+    if (parsed.length === 0) {
+      parsed = parseTabularSchedule(pasteText, "haren");
+    }
     if (parsed.length === 0) {
       setImportInfo("Keine Spiele erkannt. Bitte den kompletten Spielplan-Bereich der Mannschaftsseite kopieren (inkl. Datum, Uhrzeit und Teamnamen).");
       return;
