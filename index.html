@@ -263,6 +263,11 @@ const emptyGame = {
   },
 };
 
+const MATCH_TYPES = ["Liga", "Pokal", "Testspiel"];
+const MATCH_TYPE_COLORS = { Liga: "#3fae6b", Pokal: "#c8a13f", Testspiel: "#7a93a8" };
+const CARD_TYPES = ["Gelb", "Gelb-Rot", "Rot"];
+const CARD_COLORS = { Gelb: "#e7c246", "Gelb-Rot": "#e08a2e", Rot: "#c8102e" };
+
 function ClubCrest({ size = 40 }) {
   return (
     <img
