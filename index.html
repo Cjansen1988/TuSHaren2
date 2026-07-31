@@ -1185,6 +1185,9 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
 
   const removeFixture = (id) => setSchedule((schedule || []).filter((f) => f.id !== id));
 
+  const updateFixture = (id, field, value) =>
+    setSchedule((schedule || []).map((f) => (f.id === id ? { ...f, [field]: value } : f)));
+
   const applyFixtureToGame = (fixture) => {
     setGame({
       ...emptyGame,
@@ -1478,18 +1481,41 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 .slice()
                 .sort((a, b) => (a.date < b.date ? -1 : 1))
                 .map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2">
-                    <div className="w-24 text-xs text-[var(--text-secondary)] shrink-0">{formatDateDE(f.date)}</div>
-                    <div className="w-14 text-xs text-[var(--text-secondary)] shrink-0">{f.time || "–"}</div>
-                    <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                      style={{ background: (MATCH_TYPE_COLORS[f.matchType] || "#7a93a8") + "33", color: MATCH_TYPE_COLORS[f.matchType] || "#7a93a8" }}
+                  <div key={f.id} className="flex flex-wrap items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg px-3 py-2">
+                    <input
+                      type="date"
+                      className="w-[130px] bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-xs text-[var(--text-body)] px-2 py-1 shrink-0"
+                      value={f.date}
+                      onChange={(e) => updateFixture(f.id, "date", e.target.value)}
+                    />
+                    <input
+                      type="time"
+                      className="w-[84px] bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-xs text-[var(--text-body)] px-2 py-1 shrink-0"
+                      value={f.time}
+                      onChange={(e) => updateFixture(f.id, "time", e.target.value)}
+                    />
+                    <select
+                      className="text-[10px] font-semibold px-2 py-1 rounded-full shrink-0 bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-body)]"
+                      value={f.matchType}
+                      onChange={(e) => updateFixture(f.id, "matchType", e.target.value)}
                     >
-                      {f.matchType}
-                    </span>
-                    <div className="flex-1 text-sm text-[var(--text-primary)] truncate">
-                      {f.opponent} <span className="text-[var(--text-tertiary)] text-xs">({f.homeAway})</span>
-                    </div>
+                      {MATCH_TYPES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    <input
+                      className="flex-1 min-w-[110px] bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-sm text-[var(--text-body)] px-2 py-1"
+                      value={f.opponent}
+                      onChange={(e) => updateFixture(f.id, "opponent", e.target.value)}
+                    />
+                    <select
+                      className="text-xs bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md text-[var(--text-body)] px-2 py-1 shrink-0"
+                      value={f.homeAway}
+                      onChange={(e) => updateFixture(f.id, "homeAway", e.target.value)}
+                    >
+                      <option value="Heim">Heim</option>
+                      <option value="Auswärts">Auswärts</option>
+                    </select>
                     <button
                       onClick={() => applyFixtureToGame(f)}
                       className="text-xs font-semibold text-[var(--text-primary)] bg-[var(--border-card)] hover:bg-[#2f5643] px-3 py-1.5 rounded-md shrink-0"
