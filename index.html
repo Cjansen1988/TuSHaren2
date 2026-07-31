@@ -999,6 +999,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   const [pasteText, setPasteText] = useState("");
   const [importInfo, setImportInfo] = useState("");
   const [viewingHistory, setViewingHistory] = useState(null);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const slots = FORMATIONS[game.formation] || FORMATIONS["4-4-2"];
   const matchSquad = game.matchSquad || [];
   const lineup = game.lineup || {};
@@ -1158,12 +1159,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   };
 
   const resetGame = () => {
-    if (window.confirm("Neue Spielvorbereitung starten? Die aktuelle Vorbereitung wird in den Verlauf verschoben und bleibt dort abrufbar.")) {
-      if (game.opponentName?.trim() || game.date) {
-        setGameHistory([...(gameHistory || []), { ...game, id: uid(), archivedAt: Date.now() }]);
-      }
-      setGame({ ...emptyGame });
+    if (game.opponentName?.trim() || game.date) {
+      setGameHistory([...(gameHistory || []), { ...game, id: uid(), archivedAt: Date.now() }]);
     }
+    setGame({ ...emptyGame });
   };
 
   /* ---- Spielplan-Import (fussball.de Copy & Paste) ---- */
@@ -1418,9 +1417,30 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
         <h2 className="text-[var(--text-primary)] text-xl" style={{ fontFamily: "'Oswald', sans-serif" }}>
           AKTUELLES SPIEL
         </h2>
-        <button onClick={resetGame} className="text-xs text-[var(--text-secondary)] hover:text-[#ff8a8a] underline">
-          Neue Spielvorbereitung starten
-        </button>
+        {confirmingReset ? (
+          <div className="flex items-center gap-2 bg-[#e08a2e]/10 border border-[#e08a2e] rounded-md px-3 py-1.5">
+            <span className="text-xs text-[#e08a2e] font-semibold">Aktuelle Vorbereitung wirklich beenden?</span>
+            <button
+              onClick={() => {
+                resetGame();
+                setConfirmingReset(false);
+              }}
+              className="text-xs font-semibold text-white bg-[#c8102e] hover:bg-[#a80d26] px-2.5 py-1 rounded-md"
+            >
+              Ja, neue starten
+            </button>
+            <button
+              onClick={() => setConfirmingReset(false)}
+              className="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-card)]"
+            >
+              Abbrechen
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmingReset(true)} className="text-xs text-[var(--text-secondary)] hover:text-[#ff8a8a] underline">
+            Neue Spielvorbereitung starten
+          </button>
+        )}
       </div>
 
       <div className="flex gap-2 mb-5">
@@ -3090,27 +3110,36 @@ function LaundryTab({ squad, schedule, laundry, setLaundry }) {
       .sort((a, b) => (a.date < b.date ? -1 : 1));
     if (newFixtures.length === 0) return;
 
+    // Trikots und Warm-Up zählen beide gemeinsam als eine Wäsche-Aufgabe,
+    // damit jede*r einmal komplett dran war, bevor es von vorne losgeht.
     const tally = {};
     squad.forEach((p) => {
-      tally[p.id] = { jersey: 0, warmup: 0 };
+      tally[p.id] = 0;
     });
     (laundry || []).forEach((e) => {
-      if (e.jerseyWasherId && tally[e.jerseyWasherId]) tally[e.jerseyWasherId].jersey += 1;
-      if (e.warmupWasherId && tally[e.warmupWasherId]) tally[e.warmupWasherId].warmup += 1;
+      if (e.jerseyWasherId && tally[e.jerseyWasherId] != null) tally[e.jerseyWasherId] += 1;
+      if (e.warmupWasherId && tally[e.warmupWasherId] != null) tally[e.warmupWasherId] += 1;
     });
 
-    const pickFair = (role, excludeId) => {
-      const candidates = squad.filter((p) => p.id !== excludeId);
+    // Einmal durchmischen, damit bei Gleichstand nicht immer dieselbe Reihenfolge gewinnt
+    const shuffled = [...squad];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const pickFair = (excludeId) => {
+      const candidates = shuffled.filter((p) => p.id !== excludeId);
       if (candidates.length === 0) return "";
-      candidates.sort((a, b) => tally[a.id][role] - tally[b.id][role]);
+      candidates.sort((a, b) => tally[a.id] - tally[b.id]);
       const chosen = candidates[0];
-      tally[chosen.id][role] += 1;
+      tally[chosen.id] += 1;
       return chosen.id;
     };
 
     const newEntries = newFixtures.map((f) => {
-      const jerseyId = pickFair("jersey", null);
-      const warmupId = pickFair("warmup", jerseyId);
+      const jerseyId = pickFair(null);
+      const warmupId = pickFair(jerseyId);
       return { id: uid(), date: f.date, opponent: f.opponent, jerseyWasherId: jerseyId, warmupWasherId: warmupId };
     });
 
@@ -3120,14 +3149,46 @@ function LaundryTab({ squad, schedule, laundry, setLaundry }) {
   const counts = useMemo(() => {
     const c = {};
     (squad || []).forEach((p) => {
-      c[p.id] = { name: p.name, jersey: 0, warmup: 0 };
+      c[p.id] = { name: p.name, total: 0 };
     });
     (laundry || []).forEach((e) => {
-      if (e.jerseyWasherId && c[e.jerseyWasherId]) c[e.jerseyWasherId].jersey += 1;
-      if (e.warmupWasherId && c[e.warmupWasherId]) c[e.warmupWasherId].warmup += 1;
+      if (e.jerseyWasherId && c[e.jerseyWasherId]) c[e.jerseyWasherId].total += 1;
+      if (e.warmupWasherId && c[e.warmupWasherId]) c[e.warmupWasherId].total += 1;
     });
-    return Object.values(c).sort((a, b) => a.jersey + a.warmup - (b.jersey + b.warmup));
+    return Object.values(c).sort((a, b) => a.total - b.total);
   }, [squad, laundry]);
+
+  const projectedCounts = useMemo(() => {
+    const tally = {};
+    (squad || []).forEach((p) => {
+      tally[p.id] = 0;
+    });
+    (laundry || []).forEach((e) => {
+      if (e.jerseyWasherId && tally[e.jerseyWasherId] != null) tally[e.jerseyWasherId] += 1;
+      if (e.warmupWasherId && tally[e.warmupWasherId] != null) tally[e.warmupWasherId] += 1;
+    });
+
+    const existingKeys = new Set((laundry || []).map((e) => `${e.date}_${e.opponent}`));
+    const remainingFixtures = (schedule || []).filter((f) => !existingKeys.has(`${f.date}_${f.opponent}`));
+
+    const pick = (excludeId) => {
+      const candidates = (squad || []).filter((p) => p.id !== excludeId);
+      if (candidates.length === 0) return null;
+      candidates.sort((a, b) => tally[a.id] - tally[b.id]);
+      const chosen = candidates[0];
+      tally[chosen.id] += 1;
+      return chosen.id;
+    };
+
+    remainingFixtures.forEach(() => {
+      const j = pick(null);
+      pick(j);
+    });
+
+    return (squad || [])
+      .map((p) => ({ name: p.name, total: tally[p.id] || 0 }))
+      .sort((a, b) => b.total - a.total);
+  }, [squad, laundry, schedule]);
 
   const sorted = (laundry || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
 
@@ -3243,7 +3304,10 @@ function LaundryTab({ squad, schedule, laundry, setLaundry }) {
 
       <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
         <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Wer war wie oft dran?</h3>
-        <p className="text-[var(--text-tertiary)] text-[11px] mb-3">Hilft, die Wäsche fair zu verteilen – wenigste Einsätze zuerst.</p>
+        <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+          Trikots und Warm-Up zählen zusammen als eine Wäsche-Aufgabe. „Bisher eingetragen" zeigt den aktuellen Stand,
+          „Am Saisonende" schätzt den Endstand, sobald auch die restlichen Spiele aus dem Spielplan verteilt sind.
+        </p>
         {counts.length === 0 ? (
           <p className="text-[var(--text-tertiary)] text-sm">Erst Spieler im Tab „Kader" anlegen.</p>
         ) : (
@@ -3252,18 +3316,21 @@ function LaundryTab({ squad, schedule, laundry, setLaundry }) {
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wide text-[var(--text-secondary)] border-b border-[var(--border-card)]">
                   <th className="py-2 pr-2">Spieler</th>
-                  <th className="py-2 px-2 text-center">Trikots</th>
-                  <th className="py-2 px-2 text-center">Warm-Up</th>
+                  <th className="py-2 px-2 text-center">Bisher eingetragen</th>
+                  <th className="py-2 px-2 text-center">Am Saisonende</th>
                 </tr>
               </thead>
               <tbody>
-                {counts.map((c, i) => (
-                  <tr key={i} className="border-b border-[var(--bg-input)] text-[var(--text-body)]">
-                    <td className="py-1.5 pr-2">{c.name}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums">{c.jersey}</td>
-                    <td className="py-1.5 px-2 text-center tabular-nums">{c.warmup}</td>
-                  </tr>
-                ))}
+                {counts.map((c, i) => {
+                  const proj = projectedCounts.find((p) => p.name === c.name);
+                  return (
+                    <tr key={i} className="border-b border-[var(--bg-input)] text-[var(--text-body)]">
+                      <td className="py-1.5 pr-2">{c.name}</td>
+                      <td className="py-1.5 px-2 text-center tabular-nums">{c.total}</td>
+                      <td className="py-1.5 px-2 text-center tabular-nums font-semibold">{proj ? proj.total : c.total}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -3291,10 +3358,6 @@ function LaundryTab({ squad, schedule, laundry, setLaundry }) {
     </div>
   );
 }
-
-/* ---------------------------------------------------------------------- */
-/*  App shell                                                               */
-/* ---------------------------------------------------------------------- */
 
 const TABS = [
   { id: "kader", label: "Kader", icon: Users },
@@ -3422,7 +3485,7 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
   const goNext = () => setSlide((s) => Math.min(SLIDES.length - 1, s + 1));
 
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative" style={THEME_VARS[presTheme]}>
+    <div className="min-h-screen bg-[var(--bg-page)] flex flex-col p-8 relative overflow-y-auto" style={THEME_VARS[presTheme]}>
       <div className="absolute top-6 right-6 flex items-center gap-2">
         <button
           onClick={() => setShowQr(true)}
@@ -3477,7 +3540,7 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
 
       <div className="flex-1 flex flex-col justify-center">
         {slideDefs[slide]?.type === "ziele" && (
-          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-10">
+          <div className="max-w-5xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-12">
             <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8" style={{ fontFamily: "'Oswald', sans-serif" }}>
               Saisonziele
             </h2>
@@ -3542,8 +3605,8 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
         )}
 
         {slideDefs[slide]?.type === "gegner" && (
-          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-10">
-            <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8 flex items-center gap-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-5xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-12">
+            <h2 className="text-[var(--text-primary)] text-5xl font-semibold mb-10 flex items-center gap-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
               {game.opponentLogo && (
                 <img src={game.opponentLogo} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-[var(--border-card)]" />
               )}
@@ -3552,20 +3615,20 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
             <div className="grid grid-cols-2 gap-6 mb-6">
               {game.opponentTablePosition && (
                 <div>
-                  <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Tabellenplatz</div>
-                  <div className="text-[var(--text-primary)] text-4xl font-semibold">{game.opponentTablePosition}</div>
+                  <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Tabellenplatz</div>
+                  <div className="text-[var(--text-primary)] text-6xl font-semibold">{game.opponentTablePosition}</div>
                 </div>
               )}
               {game.opponentGoalDiff && (
                 <div>
-                  <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Torverhältnis</div>
-                  <div className="text-[var(--text-primary)] text-4xl font-semibold">{game.opponentGoalDiff}</div>
+                  <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Torverhältnis</div>
+                  <div className="text-[var(--text-primary)] text-6xl font-semibold">{game.opponentGoalDiff}</div>
                 </div>
               )}
             </div>
             {game.opponentForm && game.opponentForm.some(Boolean) && (
               <div className="mb-6">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide mb-2">Form (letzte 3 Spiele)</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide mb-2">Form (letzte 3 Spiele)</div>
                 <div className="flex gap-2">
                   {game.opponentForm.map((f, i) => {
                     const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
@@ -3573,7 +3636,7 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
                     return (
                       <div
                         key={i}
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold"
+                        className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold"
                         style={{ background: colors[f || ""] }}
                       >
                         {labels[f || ""]}
@@ -3585,66 +3648,66 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
             )}
             {game.opponentFormation && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Vermutetes System</div>
-                <div className="text-[var(--text-body)] text-xl">{game.opponentFormation}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Vermutetes System</div>
+                <div className="text-[var(--text-body)] text-2xl">{game.opponentFormation}</div>
               </div>
             )}
             {game.opponentKeyPlayers && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Schlüsselspieler</div>
-                <div className="text-[var(--text-body)] text-xl">{game.opponentKeyPlayers}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Schlüsselspieler</div>
+                <div className="text-[var(--text-body)] text-2xl">{game.opponentKeyPlayers}</div>
               </div>
             )}
             {game.opponentTopScorers && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Top-Torschützen</div>
-                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.opponentTopScorers}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Top-Torschützen</div>
+                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.opponentTopScorers}</div>
               </div>
             )}
             {game.opponentStrengths && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Stärken</div>
-                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.opponentStrengths}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Stärken</div>
+                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.opponentStrengths}</div>
               </div>
             )}
             {game.opponentWeaknesses && (
               <div>
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Schwächen</div>
-                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.opponentWeaknesses}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Schwächen</div>
+                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.opponentWeaknesses}</div>
               </div>
             )}
             {!game.opponentTablePosition && !game.opponentGoalDiff && !game.opponentFormation && !game.opponentKeyPlayers &&
               !game.opponentTopScorers && !game.opponentStrengths && !game.opponentWeaknesses && (!game.opponentForm || !game.opponentForm.some(Boolean)) && (
-              <p className="text-[var(--text-tertiary)] text-lg">Noch keine Angaben unter „Über den Gegner" eingetragen.</p>
+              <p className="text-[var(--text-tertiary)] text-xl">Noch keine Angaben unter „Über den Gegner" eingetragen.</p>
             )}
           </div>
         )}
 
         {slideDefs[slide]?.type === "spielidee" && (
-          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-10">
-            <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-5xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-12">
+            <h2 className="text-[var(--text-primary)] text-5xl font-semibold mb-10" style={{ fontFamily: "'Oswald', sans-serif" }}>
               Unsere Spielidee
             </h2>
             {game.ourTactics && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Taktische Idee</div>
-                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.ourTactics}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Taktische Idee</div>
+                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.ourTactics}</div>
               </div>
             )}
             {game.ourNotes && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Ausfälle / Sonstiges</div>
-                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.ourNotes}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Ausfälle / Sonstiges</div>
+                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.ourNotes}</div>
               </div>
             )}
             {game.reviewNotes && (
               <div>
-                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Rückblick</div>
-                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.reviewNotes}</div>
+                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Rückblick</div>
+                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.reviewNotes}</div>
               </div>
             )}
             {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
-              <p className="text-[var(--text-tertiary)] text-lg">Noch keine Angaben unter „Über uns" eingetragen.</p>
+              <p className="text-[var(--text-tertiary)] text-xl">Noch keine Angaben unter „Über uns" eingetragen.</p>
             )}
           </div>
         )}
@@ -3670,7 +3733,7 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
               className="relative mx-auto rounded-2xl border-2 border-white/20 overflow-hidden shadow-2xl"
               style={{
                 aspectRatio: "0.7",
-                height: "min(62vh, 780px)",
+                height: "min(52vh, 640px)",
                 maxWidth: "100%",
                 background: "repeating-linear-gradient(to bottom, #1d5a3d 0, #1d5a3d 11.11%, #1a5236 11.11%, #1a5236 22.22%)",
               }}
