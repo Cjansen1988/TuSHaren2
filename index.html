@@ -239,6 +239,27 @@ function computePlayerStats(playerId, matches) {
   return { apps, minutes, avgMinutes, goals, assists, scorerPerGame, minutesPerScorer, yellow, red, subIn, subOut };
 }
 
+function computeGoalProgress(type, target, totalGames, gamesPlayed, currentValue) {
+  const t = Number(target) || 0;
+  const total = Number(totalGames) || 0;
+  const played = Number(gamesPlayed) || 0;
+  const current = Number(currentValue) || 0;
+  const remainingGames = total > played ? total - played : 0;
+  const currentRate = played > 0 ? current / played : 0;
+  const pct = t > 0 ? Math.min(100, Math.round((current / t) * 100)) : 0;
+
+  if (type === "max") {
+    const remainingAllowed = Math.max(0, t - current);
+    const allowedRate = remainingGames > 0 ? remainingAllowed / remainingGames : null;
+    const onTrack = allowedRate === null ? current <= t : allowedRate >= currentRate - 0.0001;
+    return { pct, onTrack, rate: allowedRate, currentRate, remainingGames, total, played, current, target: t };
+  }
+  const remainingNeeded = Math.max(0, t - current);
+  const neededRate = remainingGames > 0 ? remainingNeeded / remainingGames : null;
+  const onTrack = neededRate === null ? current >= t : neededRate <= currentRate + 0.0001;
+  return { pct, onTrack, rate: neededRate, currentRate, remainingGames, total, played, current, target: t };
+}
+
 function findDuplicateNumbers(entries) {
   const counts = {};
   entries.forEach(({ number }) => {
@@ -446,7 +467,7 @@ const inputCls =
 
 
 const POSITIONS = ["TW", "IV", "AV", "DM", "ZM", "OM", "Flügel", "ST"];
-const SLIDE_ORDER_LABELS = { gegner: "Gegner", spielidee: "Spielidee", fokus: "Fokus-Bilder", aufstellung: "Aufstellung" };
+const SLIDE_ORDER_LABELS = { gegner: "Gegner", spielidee: "Spielidee", ziele: "Saisonziele", fokus: "Fokus-Bilder", aufstellung: "Aufstellung" };
 
 function PlayerCard({ player, stats, onClose }) {
   const statItems = [
@@ -753,7 +774,7 @@ const emptyGame = {
   pressingLine: 50,
   directArrivalIds: [],
   focusImages: [],
-  slideOrder: ["gegner", "spielidee", "fokus", "aufstellung"],
+  slideOrder: ["gegner", "spielidee", "ziele", "fokus", "aufstellung"],
   opponentLogo: null,
   date: "",
   kickoff: "",
@@ -895,7 +916,7 @@ function AuthGate({ onAuthed }) {
   );
 }
 
-function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSchedule, gameHistory, setGameHistory }) {
+function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSchedule, gameHistory, setGameHistory, seasonGoal }) {
   const [section, setSection] = useState("vorbereitung");
   const [pasteText, setPasteText] = useState("");
   const [importInfo, setImportInfo] = useState("");
@@ -1024,7 +1045,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   const removeOpponentLogo = () => setGame({ ...game, opponentLogo: null });
 
   const moveSlideOrder = (index, dir) => {
-    const order = game.slideOrder && game.slideOrder.length === 4 ? [...game.slideOrder] : ["gegner", "spielidee", "fokus", "aufstellung"];
+    const order = game.slideOrder && game.slideOrder.length === 5 ? [...game.slideOrder] : ["gegner", "spielidee", "ziele", "fokus", "aufstellung"];
     const newIndex = index + dir;
     if (newIndex < 0 || newIndex >= order.length) return;
     [order[index], order[newIndex]] = [order[newIndex], order[index]];
@@ -1304,7 +1325,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   const handleCopyResult = () => handleCopyText(resultMessage);
 
   if (viewingHistory) {
-    return <PresentationView squad={squad} game={viewingHistory} onExit={() => setViewingHistory(null)} />;
+    return <PresentationView squad={squad} game={viewingHistory} matches={matches} seasonGoal={seasonGoal} onExit={() => setViewingHistory(null)} />;
   }
 
   return (
@@ -1601,6 +1622,36 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3 flex items-center gap-2">
                 <Shield size={15} className="text-[#c8102e]" /> Rahmendaten
               </h3>
+              {(schedule || []).length > 0 && (
+                <Field label="Aus Spielplan übernehmen (optional)">
+                  <select
+                    className={inputCls}
+                    value=""
+                    onChange={(e) => {
+                      const f = (schedule || []).find((x) => x.id === e.target.value);
+                      if (!f) return;
+                      setGame({
+                        ...game,
+                        date: f.date,
+                        kickoff: f.time,
+                        opponentName: f.opponent,
+                        homeAway: f.homeAway,
+                        matchType: f.matchType,
+                      });
+                    }}
+                  >
+                    <option value="">Spiel wählen …</option>
+                    {(schedule || [])
+                      .slice()
+                      .sort((a, b) => (a.date < b.date ? -1 : 1))
+                      .map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {formatDateDE(f.date)} · {f.opponent} ({f.homeAway})
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+              )}
               <Field label="Gegner">
                 <input className={inputCls} value={game.opponentName} onChange={(e) => setGame({ ...game, opponentName: e.target.value })} />
               </Field>
@@ -1744,7 +1795,7 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
                 Legt fest, in welcher Reihenfolge die Folien in der Präsentation erscheinen.
               </p>
               <div className="space-y-1.5">
-                {(game.slideOrder && game.slideOrder.length === 4 ? game.slideOrder : ["gegner", "spielidee", "fokus", "aufstellung"]).map(
+                {(game.slideOrder && game.slideOrder.length === 5 ? game.slideOrder : ["gegner", "spielidee", "ziele", "fokus", "aufstellung"]).map(
                   (type, i, arr) => (
                     <div key={type} className="flex items-center gap-2 bg-[var(--bg-input)] border border-[var(--border-input)] rounded-md px-3 py-2">
                       <span className="text-[var(--text-tertiary)] text-xs w-5">{i + 1}.</span>
@@ -2104,6 +2155,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/*  Tab: Statistik                                                          */
+/* ---------------------------------------------------------------------- */
+
 function FormChart({ matches }) {
   const data = (matches || [])
     .filter((m) => m.scoreUs !== "" && m.scoreThem !== "" && m.scoreUs != null && m.scoreThem != null)
@@ -2157,6 +2212,64 @@ function FormChart({ matches }) {
           </g>
         ))}
       </svg>
+    </div>
+  );
+}
+
+function ExtraGoalForm({ onAdd }) {
+  const [draft, setDraft] = useState({ label: "", type: "max", target: "", totalGames: "", gamesPlayed: "", currentValue: "" });
+
+  const submit = () => {
+    if (!draft.label.trim() || draft.target === "") return;
+    onAdd({ id: uid(), ...draft, showInPresentation: false });
+    setDraft({ label: "", type: "max", target: "", totalGames: "", gamesPlayed: "", currentValue: "" });
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+        <input
+          className={inputCls}
+          placeholder="Name (z.B. Gegentore)"
+          value={draft.label}
+          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+        />
+        <select className={inputCls} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
+          <option value="max">Maximum (z.B. Gegentore)</option>
+          <option value="min">Minimum (z.B. Tore)</option>
+        </select>
+        <input
+          className={inputCls}
+          inputMode="numeric"
+          placeholder="Zielwert"
+          value={draft.target}
+          onChange={(e) => setDraft({ ...draft, target: e.target.value.replace(/\D/, "") })}
+        />
+        <input
+          className={inputCls}
+          inputMode="numeric"
+          placeholder="Spiele gesamt"
+          value={draft.totalGames}
+          onChange={(e) => setDraft({ ...draft, totalGames: e.target.value.replace(/\D/, "") })}
+        />
+        <input
+          className={inputCls}
+          inputMode="numeric"
+          placeholder="Spiele absolviert"
+          value={draft.gamesPlayed}
+          onChange={(e) => setDraft({ ...draft, gamesPlayed: e.target.value.replace(/\D/, "") })}
+        />
+        <input
+          className={inputCls}
+          inputMode="numeric"
+          placeholder="Aktueller Wert"
+          value={draft.currentValue}
+          onChange={(e) => setDraft({ ...draft, currentValue: e.target.value.replace(/\D/, "") })}
+        />
+      </div>
+      <button onClick={submit} className="flex items-center gap-1.5 bg-[#c8102e] hover:bg-[#a80d26] text-white text-sm font-semibold px-4 py-2 rounded-md">
+        <Plus size={15} /> Ziel hinzufügen
+      </button>
     </div>
   );
 }
@@ -2386,8 +2499,19 @@ function StatsTab({ matches, setMatches, seasonGoal, setSeasonGoal }) {
           </div>
 
           {seasonGoal?.targetPoints && (
-            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4">
-              <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-3">Fortschritt zum Ziel</h3>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[var(--text-primary)] text-sm font-semibold">Fortschritt zum Ziel</h3>
+                <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!seasonGoal.showPointsInPresentation}
+                    onChange={(e) => setSeasonGoal({ ...seasonGoal, showPointsInPresentation: e.target.checked })}
+                    className="accent-[#c8102e]"
+                  />
+                  In Präsentation zeigen
+                </label>
+              </div>
               {(() => {
                 const target = Number(seasonGoal.targetPoints) || 0;
                 const total = Number(seasonGoal.totalGames) || 0;
@@ -2431,6 +2555,112 @@ function StatsTab({ matches, setMatches, seasonGoal, setSeasonGoal }) {
               })()}
             </div>
           )}
+
+          <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-6">
+            <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-1">Weitere Saisonziele</h3>
+            <p className="text-[var(--text-tertiary)] text-[11px] mb-3">
+              Z.B. „maximal 50 Gegentore" oder „mindestens 60 Tore" – Werte tragt ihr hier von Hand ein.
+            </p>
+            <ExtraGoalForm onAdd={(goal) => setSeasonGoal({ ...seasonGoal, extraGoals: [...(seasonGoal?.extraGoals || []), goal] })} />
+          </div>
+
+          {(seasonGoal?.extraGoals || []).map((g) => {
+            const prog = computeGoalProgress(g.type, g.target, g.totalGames, g.gamesPlayed, g.currentValue);
+            return (
+              <div key={g.id} className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[var(--text-primary)] text-sm font-semibold">
+                    {g.label} ({g.type === "max" ? "max." : "min."} {prog.target})
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!g.showInPresentation}
+                        onChange={(e) =>
+                          setSeasonGoal({
+                            ...seasonGoal,
+                            extraGoals: seasonGoal.extraGoals.map((x) => (x.id === g.id ? { ...x, showInPresentation: e.target.checked } : x)),
+                          })
+                        }
+                        className="accent-[#c8102e]"
+                      />
+                      Präsentation
+                    </label>
+                    <button
+                      onClick={() => setSeasonGoal({ ...seasonGoal, extraGoals: seasonGoal.extraGoals.filter((x) => x.id !== g.id) })}
+                      className="text-[var(--text-tertiary)] hover:text-[#ff8a8a]"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <input
+                    className={inputCls + " text-xs"}
+                    inputMode="numeric"
+                    placeholder="Spiele gesamt"
+                    value={g.totalGames}
+                    onChange={(e) =>
+                      setSeasonGoal({
+                        ...seasonGoal,
+                        extraGoals: seasonGoal.extraGoals.map((x) => (x.id === g.id ? { ...x, totalGames: e.target.value.replace(/\D/, "") } : x)),
+                      })
+                    }
+                  />
+                  <input
+                    className={inputCls + " text-xs"}
+                    inputMode="numeric"
+                    placeholder="Spiele absolviert"
+                    value={g.gamesPlayed}
+                    onChange={(e) =>
+                      setSeasonGoal({
+                        ...seasonGoal,
+                        extraGoals: seasonGoal.extraGoals.map((x) => (x.id === g.id ? { ...x, gamesPlayed: e.target.value.replace(/\D/, "") } : x)),
+                      })
+                    }
+                  />
+                  <input
+                    className={inputCls + " text-xs"}
+                    inputMode="numeric"
+                    placeholder={g.type === "max" ? "Bisher kassiert" : "Bisher erzielt"}
+                    value={g.currentValue}
+                    onChange={(e) =>
+                      setSeasonGoal({
+                        ...seasonGoal,
+                        extraGoals: seasonGoal.extraGoals.map((x) => (x.id === g.id ? { ...x, currentValue: e.target.value.replace(/\D/, "") } : x)),
+                      })
+                    }
+                  />
+                </div>
+                <div className="w-full bg-[var(--bg-input)] rounded-full h-3 mb-2 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${prog.pct}%`, background: prog.onTrack ? "#3fae6b" : "#e08a2e" }} />
+                </div>
+                <p className="text-[var(--text-secondary)] text-xs mb-2">
+                  Aktuell: {prog.current} · {prog.played} von {prog.total || "?"} Spielen absolviert
+                </p>
+                {prog.total > 0 ? (
+                  prog.remainingGames > 0 ? (
+                    <p className={"text-sm font-semibold " + (prog.onTrack ? "text-[#3fae6b]" : "text-[#e08a2e]")}>
+                      {g.type === "max"
+                        ? prog.onTrack
+                          ? `Im Soll – ihr dürft noch ${prog.rate.toFixed(2)} pro Spiel kassieren (aktuell ${prog.currentRate.toFixed(2)}).`
+                          : `Ihr müsst die Gegentore auf ${prog.rate.toFixed(2)} pro Spiel drücken, um das Ziel zu halten (aktuell ${prog.currentRate.toFixed(2)}).`
+                        : prog.onTrack
+                        ? `Im Soll – ${prog.rate.toFixed(2)} pro Spiel reichen noch (aktuell ${prog.currentRate.toFixed(2)}).`
+                        : `Ihr braucht ${prog.rate.toFixed(2)} pro Spiel im Schnitt, um das Ziel noch zu erreichen (aktuell ${prog.currentRate.toFixed(2)}).`}
+                    </p>
+                  ) : (
+                    <p className={"text-sm font-semibold " + ((g.type === "max" ? prog.current <= prog.target : prog.current >= prog.target) ? "text-[#3fae6b]" : "text-[#c8102e]")}>
+                      {(g.type === "max" ? prog.current <= prog.target : prog.current >= prog.target) ? "Ziel erreicht! 🎉" : "Saison beendet – Ziel leider verpasst."}
+                    </p>
+                  )
+                ) : (
+                  <p className="text-[var(--text-tertiary)] text-xs">Tragt „Spiele gesamt" ein, um zu sehen, ob ihr im Soll liegt.</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -2971,16 +3201,40 @@ const TABS = [
 /*  Präsentationsmodus (für TV / Beamer am Spieltag)                       */
 /* ---------------------------------------------------------------------- */
 
-function PresentationView({ squad, game, onExit }) {
+function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
   const [slide, setSlide] = useState(0);
   const [presTheme, setPresTheme] = useState("dark");
   const [showQr, setShowQr] = useState(false);
   const focusImages = game.focusImages || [];
-  const slideOrder = game.slideOrder && game.slideOrder.length === 4 ? game.slideOrder : ["gegner", "spielidee", "fokus", "aufstellung"];
+  const slideOrder = game.slideOrder && game.slideOrder.length === 5 ? game.slideOrder : ["gegner", "spielidee", "ziele", "fokus", "aufstellung"];
+
+  const competitiveStats = useMemo(() => {
+    let w = 0, d = 0, l = 0;
+    (matches || [])
+      .filter((m) => (m.matchType || "Liga") !== "Testspiel")
+      .forEach((m) => {
+        const us = Number(m.scoreUs), them = Number(m.scoreThem);
+        if (Number.isNaN(us) || Number.isNaN(them)) return;
+        if (us > them) w++;
+        else if (us === them) d++;
+        else l++;
+      });
+    const played = w + d + l;
+    const points = w * 3 + d;
+    const avgPerGame = played > 0 ? points / played : 0;
+    return { played, points, avgPerGame };
+  }, [matches]);
+
+  const hasVisibleGoals =
+    (seasonGoal?.showPointsInPresentation && seasonGoal?.targetPoints) ||
+    (seasonGoal?.extraGoals || []).some((g) => g.showInPresentation);
+
   const slideDefs = [];
   slideOrder.forEach((type) => {
     if (type === "fokus") {
       focusImages.forEach((img, i) => slideDefs.push({ type: "fokus", label: `Fokus ${i + 1}`, imgIndex: i }));
+    } else if (type === "ziele") {
+      if (hasVisibleGoals) slideDefs.push({ type: "ziele", label: "Saisonziele" });
     } else {
       slideDefs.push({ type, label: SLIDE_ORDER_LABELS[type] });
     }
@@ -3100,7 +3354,7 @@ function PresentationView({ squad, game, onExit }) {
               </>
             )}
           </h1>
-          <div className="flex flex-wrap gap-4 mt-1 text-[var(--text-secondary)] text-lg">
+          <div className="flex flex-wrap gap-4 mt-1 text-[var(--text-secondary)] text-xl">
             {game.date && <span>{formatDateDE(game.date)}</span>}
             {game.kickoff && <span>{game.kickoff} Uhr</span>}
             <span
@@ -3115,9 +3369,74 @@ function PresentationView({ squad, game, onExit }) {
       </div>
 
       <div className="flex-1 flex flex-col justify-center">
+        {slideDefs[slide]?.type === "ziele" && (
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-10">
+            <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8" style={{ fontFamily: "'Oswald', sans-serif" }}>
+              Saisonziele
+            </h2>
+            <div className="space-y-8">
+              {seasonGoal?.showPointsInPresentation && seasonGoal?.targetPoints && (() => {
+                const target = Number(seasonGoal.targetPoints) || 0;
+                const total = Number(seasonGoal.totalGames) || 0;
+                const remainingGames = total > competitiveStats.played ? total - competitiveStats.played : 0;
+                const remainingPoints = Math.max(0, target - competitiveStats.points);
+                const neededAvg = remainingGames > 0 ? remainingPoints / remainingGames : null;
+                const pct = target > 0 ? Math.min(100, Math.round((competitiveStats.points / target) * 100)) : 0;
+                const onTrack = neededAvg === null ? competitiveStats.points >= target : neededAvg <= competitiveStats.avgPerGame + 0.001;
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[var(--text-primary)] text-xl font-semibold">
+                        Punkte{seasonGoal.targetPosition ? ` (Ziel: ${seasonGoal.targetPosition})` : ""}
+                      </span>
+                      <span className="text-[var(--text-secondary)] text-lg">
+                        {competitiveStats.points} / {target}
+                      </span>
+                    </div>
+                    <div className="w-full bg-[var(--bg-input)] rounded-full h-4 mb-2 overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: onTrack ? "#3fae6b" : "#e08a2e" }} />
+                    </div>
+                    {total > 0 && remainingGames > 0 && (
+                      <p className={"text-base font-semibold " + (onTrack ? "text-[#3fae6b]" : "text-[#e08a2e]")}>
+                        {onTrack ? "Im Soll" : "Hinter dem Soll"} – {neededAvg.toFixed(2)} Punkte/Spiel nötig (aktuell {competitiveStats.avgPerGame.toFixed(2)})
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {(seasonGoal?.extraGoals || [])
+                .filter((g) => g.showInPresentation)
+                .map((g) => {
+                  const prog = computeGoalProgress(g.type, g.target, g.totalGames, g.gamesPlayed, g.currentValue);
+                  return (
+                    <div key={g.id}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[var(--text-primary)] text-xl font-semibold">
+                          {g.label} ({g.type === "max" ? "max." : "min."} {prog.target})
+                        </span>
+                        <span className="text-[var(--text-secondary)] text-lg">
+                          {prog.current} / {prog.target}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[var(--bg-input)] rounded-full h-4 mb-2 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${prog.pct}%`, background: prog.onTrack ? "#3fae6b" : "#e08a2e" }} />
+                      </div>
+                      {prog.total > 0 && prog.remainingGames > 0 && (
+                        <p className={"text-base font-semibold " + (prog.onTrack ? "text-[#3fae6b]" : "text-[#e08a2e]")}>
+                          {prog.onTrack ? "Im Soll" : "Hinter dem Soll"} – {prog.rate.toFixed(2)} pro Spiel {g.type === "max" ? "noch erlaubt" : "noch nötig"} (aktuell {prog.currentRate.toFixed(2)})
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
         {slideDefs[slide]?.type === "gegner" && (
-          <div className="max-w-3xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
-            <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6 flex items-center gap-3" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-10">
+            <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8 flex items-center gap-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
               {game.opponentLogo && (
                 <img src={game.opponentLogo} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-[var(--border-card)]" />
               )}
@@ -3126,20 +3445,20 @@ function PresentationView({ squad, game, onExit }) {
             <div className="grid grid-cols-2 gap-6 mb-6">
               {game.opponentTablePosition && (
                 <div>
-                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Tabellenplatz</div>
-                  <div className="text-[var(--text-primary)] text-2xl font-semibold">{game.opponentTablePosition}</div>
+                  <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Tabellenplatz</div>
+                  <div className="text-[var(--text-primary)] text-4xl font-semibold">{game.opponentTablePosition}</div>
                 </div>
               )}
               {game.opponentGoalDiff && (
                 <div>
-                  <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Torverhältnis</div>
-                  <div className="text-[var(--text-primary)] text-2xl font-semibold">{game.opponentGoalDiff}</div>
+                  <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Torverhältnis</div>
+                  <div className="text-[var(--text-primary)] text-4xl font-semibold">{game.opponentGoalDiff}</div>
                 </div>
               )}
             </div>
             {game.opponentForm && game.opponentForm.some(Boolean) && (
               <div className="mb-6">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide mb-2">Form (letzte 3 Spiele)</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide mb-2">Form (letzte 3 Spiele)</div>
                 <div className="flex gap-2">
                   {game.opponentForm.map((f, i) => {
                     const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
@@ -3147,7 +3466,7 @@ function PresentationView({ squad, game, onExit }) {
                     return (
                       <div
                         key={i}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-base font-bold"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold"
                         style={{ background: colors[f || ""] }}
                       >
                         {labels[f || ""]}
@@ -3159,66 +3478,66 @@ function PresentationView({ squad, game, onExit }) {
             )}
             {game.opponentFormation && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Vermutetes System</div>
-                <div className="text-[var(--text-body)] text-lg">{game.opponentFormation}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Vermutetes System</div>
+                <div className="text-[var(--text-body)] text-xl">{game.opponentFormation}</div>
               </div>
             )}
             {game.opponentKeyPlayers && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Schlüsselspieler</div>
-                <div className="text-[var(--text-body)] text-lg">{game.opponentKeyPlayers}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Schlüsselspieler</div>
+                <div className="text-[var(--text-body)] text-xl">{game.opponentKeyPlayers}</div>
               </div>
             )}
             {game.opponentTopScorers && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Top-Torschützen</div>
-                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.opponentTopScorers}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Top-Torschützen</div>
+                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.opponentTopScorers}</div>
               </div>
             )}
             {game.opponentStrengths && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Stärken</div>
-                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.opponentStrengths}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Stärken</div>
+                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.opponentStrengths}</div>
               </div>
             )}
             {game.opponentWeaknesses && (
               <div>
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Schwächen</div>
-                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.opponentWeaknesses}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Schwächen</div>
+                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.opponentWeaknesses}</div>
               </div>
             )}
             {!game.opponentTablePosition && !game.opponentGoalDiff && !game.opponentFormation && !game.opponentKeyPlayers &&
               !game.opponentTopScorers && !game.opponentStrengths && !game.opponentWeaknesses && (!game.opponentForm || !game.opponentForm.some(Boolean)) && (
-              <p className="text-[var(--text-tertiary)] text-base">Noch keine Angaben unter „Über den Gegner" eingetragen.</p>
+              <p className="text-[var(--text-tertiary)] text-lg">Noch keine Angaben unter „Über den Gegner" eingetragen.</p>
             )}
           </div>
         )}
 
         {slideDefs[slide]?.type === "spielidee" && (
-          <div className="max-w-3xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-8">
-            <h2 className="text-[var(--text-primary)] text-2xl font-semibold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-10">
+            <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8" style={{ fontFamily: "'Oswald', sans-serif" }}>
               Unsere Spielidee
             </h2>
             {game.ourTactics && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Taktische Idee</div>
-                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.ourTactics}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Taktische Idee</div>
+                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.ourTactics}</div>
               </div>
             )}
             {game.ourNotes && (
               <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Ausfälle / Sonstiges</div>
-                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.ourNotes}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Ausfälle / Sonstiges</div>
+                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.ourNotes}</div>
               </div>
             )}
             {game.reviewNotes && (
               <div>
-                <div className="text-[var(--text-tertiary)] text-sm uppercase tracking-wide">Rückblick</div>
-                <div className="text-[var(--text-body)] text-lg whitespace-pre-line">{game.reviewNotes}</div>
+                <div className="text-[var(--text-tertiary)] text-base uppercase tracking-wide">Rückblick</div>
+                <div className="text-[var(--text-body)] text-xl whitespace-pre-line">{game.reviewNotes}</div>
               </div>
             )}
             {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
-              <p className="text-[var(--text-tertiary)] text-base">Noch keine Angaben unter „Über uns" eingetragen.</p>
+              <p className="text-[var(--text-tertiary)] text-lg">Noch keine Angaben unter „Über uns" eingetragen.</p>
             )}
           </div>
         )}
@@ -3241,9 +3560,11 @@ function PresentationView({ squad, game, onExit }) {
         {slideDefs[slide]?.type === "aufstellung" && (
           <div className="w-full">
             <div
-              className="relative w-full max-w-3xl mx-auto rounded-2xl border-2 border-white/20 overflow-hidden shadow-2xl"
+              className="relative mx-auto rounded-2xl border-2 border-white/20 overflow-hidden shadow-2xl"
               style={{
                 aspectRatio: "0.7",
+                height: "min(62vh, 780px)",
+                maxWidth: "100%",
                 background: "repeating-linear-gradient(to bottom, #1d5a3d 0, #1d5a3d 11.11%, #1a5236 11.11%, #1a5236 22.22%)",
               }}
             >
@@ -3342,7 +3663,6 @@ function PresentationView({ squad, game, onExit }) {
         )}
       </div>
 
-
       <div className="flex items-center justify-center gap-3 mt-8">
         <button
           onClick={goPrev}
@@ -3436,7 +3756,7 @@ export default function App() {
   const [schedule, setSchedule, scheduleLoaded] = useFirestoreValue("schedule", []);
   const [gameHistory, setGameHistory, gameHistoryLoaded] = useFirestoreValue("gameHistory", []);
   const [laundry, setLaundry, laundryLoaded] = useFirestoreValue("laundry", []);
-  const [seasonGoal, setSeasonGoal, seasonGoalLoaded] = useFirestoreValue("seasonGoal", { targetPosition: "", targetPoints: "", totalGames: "" });
+  const [seasonGoal, setSeasonGoal, seasonGoalLoaded] = useFirestoreValue("seasonGoal", { targetPosition: "", targetPoints: "", totalGames: "", showPointsInPresentation: false, extraGoals: [] });
 
   const allLoaded = squadLoaded && gameLoaded && matchesLoaded && credsLoaded && scheduleLoaded && gameHistoryLoaded && laundryLoaded && seasonGoalLoaded;
 
@@ -3461,7 +3781,7 @@ export default function App() {
   if (presenting) {
     return (
       <div style={THEME_VARS[theme]}>
-        <PresentationView squad={squad} game={game} onExit={() => setPresenting(false)} />
+        <PresentationView squad={squad} game={game} matches={matches} seasonGoal={seasonGoal} onExit={() => setPresenting(false)} />
       </div>
     );
   }
@@ -3524,7 +3844,7 @@ export default function App() {
 
       <main className="px-4 sm:px-6 py-6">
         {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} matches={matches} />}
-        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} />}
+        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} seasonGoal={seasonGoal} />}
         {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} seasonGoal={seasonGoal} setSeasonGoal={setSeasonGoal} />}
         {tab === "waesche" && <LaundryTab squad={squad} schedule={schedule} laundry={laundry} setLaundry={setLaundry} />}
         {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
