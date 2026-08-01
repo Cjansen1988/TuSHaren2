@@ -3586,8 +3586,8 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
 
       <div className="flex-1 flex flex-col justify-center">
         {slideDefs[slide]?.type === "ziele" && (
-          <div className="max-w-5xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-12">
-            <h2 className="text-[var(--text-primary)] text-4xl font-semibold mb-8" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-12">
+            <h2 className="text-[var(--text-primary)] text-4xl font-bold mb-8 pb-6 border-b border-[var(--border-card)]" style={{ fontFamily: "'Oswald', sans-serif" }}>
               Saisonziele
             </h2>
             <div className="space-y-8">
@@ -3601,15 +3601,15 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
                 const onTrack = neededAvg === null ? competitiveStats.points >= target : neededAvg <= competitiveStats.avgPerGame + 0.001;
                 return (
                   <div>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2.5">
                       <span className="text-[var(--text-primary)] text-xl font-semibold">
                         Punkte{seasonGoal.targetPosition ? ` (Ziel: ${seasonGoal.targetPosition})` : ""}
                       </span>
-                      <span className="text-[var(--text-secondary)] text-lg">
+                      <span className="text-[var(--text-secondary)] text-lg tabular-nums">
                         {competitiveStats.points} / {target}
                       </span>
                     </div>
-                    <div className="w-full bg-[var(--bg-input)] rounded-full h-4 mb-2 overflow-hidden">
+                    <div className="w-full bg-[var(--bg-input)] rounded-full h-3 mb-2.5 overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: onTrack ? "#3fae6b" : "#e08a2e" }} />
                     </div>
                     {total > 0 && remainingGames > 0 && (
@@ -3627,15 +3627,15 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
                   const prog = computeGoalProgress(g.type, g.target, g.totalGames, g.gamesPlayed, g.currentValue);
                   return (
                     <div key={g.id}>
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-2.5">
                         <span className="text-[var(--text-primary)] text-xl font-semibold">
                           {g.label} ({g.type === "max" ? "max." : "min."} {prog.target})
                         </span>
-                        <span className="text-[var(--text-secondary)] text-lg">
+                        <span className="text-[var(--text-secondary)] text-lg tabular-nums">
                           {prog.current} / {prog.target}
                         </span>
                       </div>
-                      <div className="w-full bg-[var(--bg-input)] rounded-full h-4 mb-2 overflow-hidden">
+                      <div className="w-full bg-[var(--bg-input)] rounded-full h-3 mb-2.5 overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${prog.pct}%`, background: prog.onTrack ? "#3fae6b" : "#e08a2e" }} />
                       </div>
                       {prog.total > 0 && prog.remainingGames > 0 && (
@@ -3651,38 +3651,42 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
         )}
 
         {slideDefs[slide]?.type === "gegner" && (
-          <div className="max-w-5xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-12">
-            <h2 className="text-[var(--text-primary)] text-5xl font-semibold mb-10 flex items-center gap-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-12">
+            <h2 className="text-[var(--text-primary)] text-4xl font-bold mb-8 pb-6 border-b border-[var(--border-card)] flex items-center gap-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
               {game.opponentLogo && (
-                <img src={game.opponentLogo} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-[var(--border-card)]" />
+                <img src={game.opponentLogo} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-[var(--border-card)] shrink-0" />
               )}
               Über {game.opponentName || "den Gegner"}
             </h2>
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              {game.opponentTablePosition && (
-                <div>
-                  <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Tabellenplatz</div>
-                  <div className="text-[var(--text-primary)] text-6xl font-semibold">{game.opponentTablePosition}</div>
-                </div>
-              )}
-              {game.opponentGoalDiff && (
-                <div>
-                  <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Torverhältnis</div>
-                  <div className="text-[var(--text-primary)] text-6xl font-semibold">{game.opponentGoalDiff}</div>
-                </div>
-              )}
-            </div>
+
+            {(game.opponentTablePosition || game.opponentGoalDiff) && (
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                {game.opponentTablePosition && (
+                  <div className="bg-[var(--bg-input)] rounded-xl p-6 text-center">
+                    <div className="text-[var(--text-tertiary)] text-sm font-semibold uppercase tracking-widest mb-1">Tabellenplatz</div>
+                    <div className="text-[var(--text-primary)] text-5xl font-bold">{game.opponentTablePosition}</div>
+                  </div>
+                )}
+                {game.opponentGoalDiff && (
+                  <div className="bg-[var(--bg-input)] rounded-xl p-6 text-center">
+                    <div className="text-[var(--text-tertiary)] text-sm font-semibold uppercase tracking-widest mb-1">Torverhältnis</div>
+                    <div className="text-[var(--text-primary)] text-5xl font-bold">{game.opponentGoalDiff}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {game.opponentForm && game.opponentForm.some(Boolean) && (
-              <div className="mb-6">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide mb-2">Form (letzte 3 Spiele)</div>
-                <div className="flex gap-2">
+              <div className="mb-8">
+                <div className="text-[var(--text-tertiary)] text-sm font-semibold uppercase tracking-widest mb-3">Form (letzte 3 Spiele)</div>
+                <div className="flex gap-3">
                   {game.opponentForm.map((f, i) => {
                     const colors = { S: "#3fae6b", U: "#c8a13f", N: "#c8102e", "": "#254536" };
                     const labels = { S: "S", U: "U", N: "N", "": "–" };
                     return (
                       <div
                         key={i}
-                        className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0"
                         style={{ background: colors[f || ""] }}
                       >
                         {labels[f || ""]}
@@ -3692,36 +3696,24 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
                 </div>
               </div>
             )}
-            {game.opponentFormation && (
-              <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Vermutetes System</div>
-                <div className="text-[var(--text-body)] text-2xl">{game.opponentFormation}</div>
-              </div>
-            )}
-            {game.opponentKeyPlayers && (
-              <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Schlüsselspieler</div>
-                <div className="text-[var(--text-body)] text-2xl">{game.opponentKeyPlayers}</div>
-              </div>
-            )}
-            {game.opponentTopScorers && (
-              <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Top-Torschützen</div>
-                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.opponentTopScorers}</div>
-              </div>
-            )}
-            {game.opponentStrengths && (
-              <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Stärken</div>
-                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.opponentStrengths}</div>
-              </div>
-            )}
-            {game.opponentWeaknesses && (
-              <div>
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Schwächen</div>
-                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.opponentWeaknesses}</div>
-              </div>
-            )}
+
+            <div className="divide-y divide-[var(--border-card)]">
+              {[
+                ["Vermutetes System", game.opponentFormation],
+                ["Schlüsselspieler", game.opponentKeyPlayers],
+                ["Top-Torschützen", game.opponentTopScorers],
+                ["Stärken", game.opponentStrengths],
+                ["Schwächen", game.opponentWeaknesses],
+              ]
+                .filter(([, value]) => value)
+                .map(([label, value]) => (
+                  <div key={label} className="py-5 first:pt-0 last:pb-0">
+                    <div className="text-[var(--text-tertiary)] text-sm font-semibold uppercase tracking-widest mb-1.5">{label}</div>
+                    <div className="text-[var(--text-body)] text-2xl leading-snug whitespace-pre-line">{value}</div>
+                  </div>
+                ))}
+            </div>
+
             {!game.opponentTablePosition && !game.opponentGoalDiff && !game.opponentFormation && !game.opponentKeyPlayers &&
               !game.opponentTopScorers && !game.opponentStrengths && !game.opponentWeaknesses && (!game.opponentForm || !game.opponentForm.some(Boolean)) && (
               <p className="text-[var(--text-tertiary)] text-xl">Noch keine Angaben unter „Über den Gegner" eingetragen.</p>
@@ -3730,28 +3722,24 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
         )}
 
         {slideDefs[slide]?.type === "spielidee" && (
-          <div className="max-w-5xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-12">
-            <h2 className="text-[var(--text-primary)] text-5xl font-semibold mb-10" style={{ fontFamily: "'Oswald', sans-serif" }}>
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-12">
+            <h2 className="text-[var(--text-primary)] text-4xl font-bold mb-8 pb-6 border-b border-[var(--border-card)]" style={{ fontFamily: "'Oswald', sans-serif" }}>
               Unsere Spielidee
             </h2>
-            {game.ourTactics && (
-              <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Taktische Idee</div>
-                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.ourTactics}</div>
-              </div>
-            )}
-            {game.ourNotes && (
-              <div className="mb-4">
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Ausfälle / Sonstiges</div>
-                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.ourNotes}</div>
-              </div>
-            )}
-            {game.reviewNotes && (
-              <div>
-                <div className="text-[var(--text-tertiary)] text-lg uppercase tracking-wide">Rückblick</div>
-                <div className="text-[var(--text-body)] text-2xl whitespace-pre-line">{game.reviewNotes}</div>
-              </div>
-            )}
+            <div className="divide-y divide-[var(--border-card)]">
+              {[
+                ["Taktische Idee", game.ourTactics],
+                ["Ausfälle / Sonstiges", game.ourNotes],
+                ["Rückblick", game.reviewNotes],
+              ]
+                .filter(([, value]) => value)
+                .map(([label, value]) => (
+                  <div key={label} className="py-5 first:pt-0 last:pb-0">
+                    <div className="text-[var(--text-tertiary)] text-sm font-semibold uppercase tracking-widest mb-1.5">{label}</div>
+                    <div className="text-[var(--text-body)] text-2xl leading-snug whitespace-pre-line">{value}</div>
+                  </div>
+                ))}
+            </div>
             {!game.ourTactics && !game.ourNotes && !game.reviewNotes && (
               <p className="text-[var(--text-tertiary)] text-xl">Noch keine Angaben unter „Über uns" eingetragen.</p>
             )}
@@ -3759,11 +3747,11 @@ function PresentationView({ squad, game, matches, seasonGoal, onExit }) {
         )}
 
         {slideDefs[slide]?.type === "fokus" && focusImages[slideDefs[slide].imgIndex] && (
-          <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
+          <div className="max-w-4xl mx-auto w-full bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-8 flex flex-col items-center">
             <img
               src={focusImages[slideDefs[slide].imgIndex].dataUrl}
               alt={focusImages[slideDefs[slide].imgIndex].caption || slideDefs[slide].label}
-              className="max-h-[62vh] w-auto rounded-xl border border-[var(--border-card)] object-contain"
+              className="max-h-[56vh] w-auto rounded-xl object-contain"
             />
             {focusImages[slideDefs[slide].imgIndex].caption && (
               <p className="text-[var(--text-primary)] text-xl mt-6 text-center max-w-2xl">
