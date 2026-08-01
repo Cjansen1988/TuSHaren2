@@ -1366,10 +1366,14 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
       }
     }
 
-    const normalizeMatch = (s) => (s || "").trim().toLowerCase();
-    const washEntry = (laundry || []).find(
+    const normalizeMatch = (s) => (s || "").trim().toLowerCase().replace(/[\u2010-\u2015]/g, "-").replace(/\s+/g, " ");
+    let washEntry = (laundry || []).find(
       (e) => e.date === game.date && normalizeMatch(e.opponent) === normalizeMatch(game.opponentName)
     );
+    if (!washEntry) {
+      // Fallback, falls sich Datum minimal unterscheidet (z.B. verschoben) – nach Gegner allein suchen
+      washEntry = (laundry || []).find((e) => normalizeMatch(e.opponent) === normalizeMatch(game.opponentName));
+    }
     if (washEntry && (washEntry.jerseyWasherId || washEntry.warmupWasherId)) {
       const washLines = [];
       if (washEntry.jerseyWasherId) washLines.push(`👕 Trikots wäscht: ${getPlayer(washEntry.jerseyWasherId)?.name || "–"}`);
@@ -2087,8 +2091,8 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
           )}
           {!(laundry || []).some(
             (e) =>
-              e.date === game.date &&
-              (e.opponent || "").trim().toLowerCase() === (game.opponentName || "").trim().toLowerCase() &&
+              (e.opponent || "").trim().toLowerCase().replace(/[\u2010-\u2015]/g, "-") ===
+                (game.opponentName || "").trim().toLowerCase().replace(/[\u2010-\u2015]/g, "-") &&
               (e.jerseyWasherId || e.warmupWasherId)
           ) && (
             <p className="text-[var(--text-tertiary)] text-xs mt-2">
