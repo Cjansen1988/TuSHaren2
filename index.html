@@ -4066,7 +4066,7 @@ export default function App() {
 
       <main className="px-4 sm:px-6 py-6">
         {tab === "kader" && <KaderTab squad={squad} setSquad={setSquad} matches={matches} />}
-        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} seasonGoal={seasonGoal} />}
+        {tab === "spiel" && <GameTab squad={squad} game={game} setGame={setGame} matches={matches} setMatches={setMatches} schedule={schedule} setSchedule={setSchedule} gameHistory={gameHistory} setGameHistory={setGameHistory} seasonGoal={seasonGoal} laundry={laundry} />}
         {tab === "statistik" && <StatsTab matches={matches} setMatches={setMatches} seasonGoal={seasonGoal} setSeasonGoal={setSeasonGoal} />}
         {tab === "waesche" && <LaundryTab squad={squad} schedule={schedule} laundry={laundry} setLaundry={setLaundry} />}
         {tab === "info" && <InfoTab creds={creds} setCreds={setCreds} />}
