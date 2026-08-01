@@ -1366,7 +1366,10 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
       }
     }
 
-    const washEntry = (laundry || []).find((e) => e.date === game.date && e.opponent === game.opponentName);
+    const normalizeMatch = (s) => (s || "").trim().toLowerCase();
+    const washEntry = (laundry || []).find(
+      (e) => e.date === game.date && normalizeMatch(e.opponent) === normalizeMatch(game.opponentName)
+    );
     if (washEntry && (washEntry.jerseyWasherId || washEntry.warmupWasherId)) {
       const washLines = [];
       if (washEntry.jerseyWasherId) washLines.push(`👕 Trikots wäscht: ${getPlayer(washEntry.jerseyWasherId)?.name || "–"}`);
@@ -2082,7 +2085,12 @@ function GameTab({ squad, game, setGame, matches, setMatches, schedule, setSched
               Tipp: Wählt unter „Vorbereitung" zuerst den Kader für diesen Spieltag aus, damit die Spielerliste in der Nachricht erscheint.
             </p>
           )}
-          {!(laundry || []).some((e) => e.date === game.date && e.opponent === game.opponentName && (e.jerseyWasherId || e.warmupWasherId)) && (
+          {!(laundry || []).some(
+            (e) =>
+              e.date === game.date &&
+              (e.opponent || "").trim().toLowerCase() === (game.opponentName || "").trim().toLowerCase() &&
+              (e.jerseyWasherId || e.warmupWasherId)
+          ) && (
             <p className="text-[var(--text-tertiary)] text-xs mt-2">
               Tipp: Tragt im Tab „Wäsche" Trikot-/Warm-Up-Wäscher für dieses Spiel ein, damit sie hier automatisch mit auftauchen.
             </p>
